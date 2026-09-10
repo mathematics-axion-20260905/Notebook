@@ -85,11 +85,11 @@ For a local or hosted Jupyter Server, set `NEXT_PUBLIC_JUPYTER_URL` and optional
 
 Production stack files included:
 
-- [Dockerfile](/Users/macbookpro/Documents/Notebook/Dockerfile)
-- [backend/Dockerfile](/Users/macbookpro/Documents/Notebook/backend/Dockerfile)
-- [docker-compose.prod.yml](/Users/macbookpro/Documents/Notebook/docker-compose.prod.yml)
-- [ops/nginx.conf](/Users/macbookpro/Documents/Notebook/ops/nginx.conf)
-- [docs/deployment-vps.md](/Users/macbookpro/Documents/Notebook/docs/deployment-vps.md)
+- [Dockerfile](./Dockerfile)
+- [backend/Dockerfile](./backend/Dockerfile)
+- [docker-compose.prod.yml](./docker-compose.prod.yml)
+- [ops/nginx.conf](./ops/nginx.conf)
+- [docs/deployment-vps.md](./docs/deployment-vps.md)
 
 Services:
 
@@ -101,8 +101,23 @@ Services:
 - nginx reverse proxy
 
 For a systemd deployment, install
-[`ops/axion-notebook-worker.service`](/Users/user2/Documents/ecosystem/Notebook/ops/axion-notebook-worker.service)
+[`ops/axion-notebook-worker.service`](./ops/axion-notebook-worker.service)
 alongside the backend service so queued jobs survive frontend restarts.
+
+### Separate-server staging
+
+The frontend is built with public URLs, so a deployment on a different host or
+port must provide `NEXT_PUBLIC_API_URL`,
+`NEXT_PUBLIC_ECOSYSTEM_CORE_URL`, and the `NEXT_PUBLIC_*_URL` app links before
+`npm run build`. These values are intentionally not committed: each server
+can point at a different API or relay host.
+
+The current pre-auth deployment uses browser-local Pyodide for Python cells
+when `NEXT_PUBLIC_JUPYTER_URL` is unset. Structured solve/graph/table jobs
+are processed by the Django worker. A hosted Jupyter Server is an optional
+execution boundary; do not expose a shared Jupyter token to untrusted users.
+Enable it only behind an authenticated, isolated Jupyter deployment or a
+server-side broker before public production.
 
 ## CI
 
@@ -113,7 +128,7 @@ GitHub Actions runs:
 - frontend build
 - backend migrate/check/test
 
-Workflow file: [.github/workflows/ci.yml](/Users/macbookpro/Documents/Notebook/.github/workflows/ci.yml)
+Workflow file: [.github/workflows/ci.yml](./.github/workflows/ci.yml)
 
 ## Extension rules
 

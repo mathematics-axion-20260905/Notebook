@@ -35,9 +35,23 @@ For the frontend, export:
 ```bash
 export NEXT_PUBLIC_API_URL=https://your-domain.com/api
 export INTERNAL_API_URL=http://backend:8000
+export NEXT_PUBLIC_ECOSYSTEM_CORE_URL=https://core.example.com/api
+export NEXT_PUBLIC_SCIENCE_URL=https://science.example.com/
+export NEXT_PUBLIC_MATH_URL=https://math.example.com/laboratory
+export NEXT_PUBLIC_NOTEBOOK_URL=https://notebook.example.com/workspace
+export NEXT_PUBLIC_WRITER_URL=https://writer.example.com/documents
+export NEXT_PUBLIC_MATH_OBJECT_URL=https://math.example.com/laboratory
+export NEXT_PUBLIC_NOTEBOOK_OBJECT_URL=https://notebook.example.com/workspace
+export NEXT_PUBLIC_WRITER_OBJECT_URL=https://writer.example.com/new
+export NEXT_PUBLIC_SCIENCE_OBJECT_URL=https://science.example.com/projects
 export POSTGRES_DB=notebook
 export POSTGRES_USER=notebook
 export POSTGRES_PASSWORD=change-me
+
+# Optional only for a protected Jupyter deployment. Leave unset to use the
+# browser-local Pyodide runtime during the pre-auth stage.
+# export NEXT_PUBLIC_JUPYTER_URL=https://jupyter.example.com/
+# export NEXT_PUBLIC_JUPYTER_KERNEL=python3
 ```
 
 ## 3. Launch
@@ -99,3 +113,5 @@ docker compose -f docker-compose.prod.yml up -d
 4. Run one compute block and confirm execution history appears.
 5. Create a checkpoint and restore it.
 6. Verify `/healthz` returns `ok`.
+7. From Math, send one Scientific Object to Notebook and Writer; confirm the
+   target imports the exact payload and the relay record is deleted.
