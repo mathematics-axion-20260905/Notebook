@@ -3,8 +3,9 @@
 import React from "react";
 
 import { AxActionLink, AxBadge, AxButton, AxPanel } from "@/components/axion";
-import { getEcosystemHref, getEcosystemObjectHref } from "@/lib/ecosystem/apps";
+import { getEcosystemHref, getEcosystemObjectHref, getEcosystemTransferHref } from "@/lib/ecosystem/apps";
 import { exportLocalScientificObject, getLocalScientificObject, importLocalScientificObject, listLocalScientificObjects } from "@/lib/ecosystem/local-object-store";
+import { publishScientificObjectTransfer } from "@/lib/ecosystem/transfer";
 import { getLocalProjectTitle, resolveActiveProjectId } from "@/lib/ecosystem/project-context";
 import type { ScientificObject } from "@/lib/ecosystem/contracts";
 
@@ -24,6 +25,7 @@ export function ProjectObjectTray() {
   const [open, setOpen] = React.useState(false);
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
   const [transferState, setTransferState] = React.useState<string | null>(null);
+  const [sendingObjectId, setSendingObjectId] = React.useState<string | null>(null);
   const importInputRef = React.useRef<HTMLInputElement>(null);
 
   const refresh = React.useCallback(async () => {
@@ -51,6 +53,19 @@ export function ProjectObjectTray() {
   if (!projectId) return null;
 
   const mathObjects = objects.filter((object) => object.sourceApp === "math");
+
+  const sendObjectToWriter = async (objectId: string) => {
+    if (!projectId) return;
+    setSendingObjectId(objectId);
+    setTransferState("Sending…");
+    try {
+      const transfer = await publishScientificObjectTransfer(await exportLocalScientificObject(objectId));
+      window.location.assign(getEcosystemTransferHref("writer", transfer.transferId, projectId));
+    } catch (error) {
+      setTransferState(error instanceof Error ? error.message : "Transfer failed");
+      setSendingObjectId(null);
+    }
+  };
 
   return (
     <section className="ax-work-subnav text-[var(--ax-text)]">
@@ -100,7 +115,14 @@ export function ProjectObjectTray() {
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                 <AxActionLink href={getEcosystemObjectHref("notebook", projectId, object.id)} size="sm" variant="quiet">Use</AxActionLink>
-                <AxActionLink href={getEcosystemObjectHref("writer", projectId, object.id)} size="sm" variant="primary">Writer</AxActionLink>
+                <AxButton
+                  size="sm"
+                  variant="primary"
+                  disabled={sendingObjectId === object.id}
+                  onClick={() => void sendObjectToWriter(object.id)}
+                >
+                  {sendingObjectId === object.id ? "Sending…" : "Writer"}
+                </AxButton>
                 <AxButton
                   size="sm"
                   onClick={async () => {
