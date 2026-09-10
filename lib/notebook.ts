@@ -128,7 +128,7 @@ async function parseApiError(response: Response) {
     }
 }
 
-export async function fetchNotebookDocuments() {
+export async function fetchNotebookDocuments(): Promise<NotebookDocument[]> {
     const response = await fetchPublic("/api/notebook/documents/?ordering=-updated_at");
     if (!response.ok) throw new Error(await parseApiError(response));
     const data = await response.json();

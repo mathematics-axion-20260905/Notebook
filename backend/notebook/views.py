@@ -15,6 +15,7 @@ from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
@@ -371,8 +372,24 @@ class BootstrapDemoUserView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        if not settings.DEBUG:
-            return Response({"detail": "Not available."}, status=status.HTTP_404_NOT_FOUND)
-        if not User.objects.filter(username="demo").exists():
-            User.objects.create_user(username="demo", password="demo-demo-2026")
-        return Response({"status": "ready", "username": "demo"})
+        """Issue a temporary shared guest session until product auth is introduced.
+
+        This deliberately has no account or RBAC semantics. It is a staging
+        bridge so the notebook can use its real persistence APIs without
+        forcing an auth product decision yet.
+        """
+        username = "axion-guest"
+        password = settings.NOTEBOOK_GUEST_PASSWORD
+        user, created = User.objects.get_or_create(username=username)
+        if created:
+            user.set_password(password)
+            user.save(update_fields=["password"])
+        refresh = RefreshToken.for_user(user)
+        return Response(
+            {
+                "status": "ready",
+                "username": username,
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+            }
+        )

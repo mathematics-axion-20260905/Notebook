@@ -12,6 +12,13 @@ const configuredUrls: Record<EcosystemApp, string> = {
   writer: process.env.NEXT_PUBLIC_WRITER_URL || "/writer/documents",
 };
 
+const configuredObjectUrls: Record<EcosystemApp, string> = {
+  science: process.env.NEXT_PUBLIC_SCIENCE_OBJECT_URL || "/projects",
+  math: process.env.NEXT_PUBLIC_MATH_OBJECT_URL || "/math/laboratory",
+  notebook: process.env.NEXT_PUBLIC_NOTEBOOK_OBJECT_URL || "/notebook/workspace",
+  writer: process.env.NEXT_PUBLIC_WRITER_OBJECT_URL || "/writer/new",
+};
+
 export const ECOSYSTEM_APPS: Array<{ id: EcosystemApp; label: string }> = [
   { id: "math", label: "Math" },
   { id: "notebook", label: "Notebook" },
@@ -27,6 +34,13 @@ export function getEcosystemHref(app: EcosystemApp, _currentApp: EcosystemApp, p
 }
 
 export function getEcosystemObjectHref(app: EcosystemApp, projectId: string, objectId: string): string {
-  const base = app === "writer" ? "/new" : configuredUrls[app];
+  const base = configuredObjectUrls[app];
   return `${base}${base.includes("?") ? "&" : "?"}source=project&project=${encodeURIComponent(projectId)}&objectId=${encodeURIComponent(objectId)}`;
+}
+
+export function getEcosystemTransferHref(app: EcosystemApp, transferId: string, projectId?: string | null): string {
+  const base = configuredObjectUrls[app];
+  const params = new URLSearchParams({ source: "transfer", transferId });
+  if (projectId) params.set("project", projectId);
+  return `${base}${base.includes("?") ? "&" : "?"}${params.toString()}`;
 }

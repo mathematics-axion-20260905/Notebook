@@ -57,7 +57,16 @@ export async function bootstrapDemoNotebookUser() {
         method: "POST",
     });
     if (!response.ok) throw new Error(await parseApiError(response));
-    return await response.json() as { status: string; username: string };
+    return await response.json() as { status: string; username: string; access: string; refresh: string };
+}
+
+export async function ensureNotebookGuestSession() {
+    const current = await fetchNotebookSession();
+    if (current) return current;
+    const bootstrap = await bootstrapDemoNotebookUser();
+    window.localStorage.setItem("notebook_access_token", bootstrap.access);
+    window.localStorage.setItem("notebook_refresh_token", bootstrap.refresh);
+    return await fetchNotebookSession();
 }
 
 export function logoutNotebookUser() {

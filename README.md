@@ -58,9 +58,14 @@ backend/.venv/bin/python backend/manage.py process_execution_jobs --poll-interva
 - JWT login: `POST /api/token/`
 - token refresh: `POST /api/token/refresh/`
 - current session: `GET /api/notebook/auth/session/`
-- dev demo bootstrap: `POST /api/notebook/auth/bootstrap-demo/` when `DJANGO_DEBUG=True`
+- temporary guest bootstrap: `POST /api/notebook/auth/bootstrap-demo/` (pre-auth stage only)
 
 Anonymous users can read only notebooks marked `public_read`. Write, execute, checkpoint, and restore operations require authentication and ownership.
+
+Until product authentication is introduced, the visible workspace obtains a
+temporary shared `axion-guest` session automatically so it can exercise the
+real persistence and execution APIs. This is intentionally not suitable for
+multi-user production and must be replaced before public launch.
 
 ## Execution model
 
@@ -94,6 +99,10 @@ Services:
 - Redis
 - execution worker
 - nginx reverse proxy
+
+For a systemd deployment, install
+[`ops/axion-notebook-worker.service`](/Users/user2/Documents/ecosystem/Notebook/ops/axion-notebook-worker.service)
+alongside the backend service so queued jobs survive frontend restarts.
 
 ## CI
 

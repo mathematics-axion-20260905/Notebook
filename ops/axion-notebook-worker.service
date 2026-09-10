@@ -1,0 +1,17 @@
+[Unit]
+Description=Axion Notebook execution worker
+After=network.target axion-notebook-back.service
+Wants=axion-notebook-back.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/projects/Notebook/backend
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/root/projects/Notebook/backend/.venv/bin/python manage.py process_execution_jobs --poll-interval 2.0
+Restart=always
+RestartSec=5
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

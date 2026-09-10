@@ -41,12 +41,16 @@ import {
 } from "recharts";
 
 import { LaboratoryInlineMathMarkdown } from "@/components/laboratory/laboratory-inline-math-markdown";
-import { createLocalScientificObject, createLocalScientificReference, getLocalScientificObject } from "@/lib/ecosystem/local-object-store";
+import { createLocalScientificObject, createLocalScientificReference, exportLocalScientificObject, getLocalScientificObject, importLocalScientificObject } from "@/lib/ecosystem/local-object-store";
 import type { ScientificObjectReference } from "@/lib/ecosystem/contracts";
+import { discardScientificObjectTransfer, fetchScientificObjectTransfer } from "@/lib/ecosystem/transfer";
+import { publishScientificObjectTransfer } from "@/lib/ecosystem/transfer";
 import { createNotebookKernelAdapter, type NotebookKernelAdapter } from "@/features/notebook/core/jupyter-adapter";
-import type { NotebookExecutionTarget } from "@/features/notebook/core/types";
-import { getEcosystemObjectHref } from "@/lib/ecosystem/apps";
+import type { NotebookBlock as ApiNotebookBlock, NotebookExecutionTarget } from "@/features/notebook/core/types";
+import { getEcosystemObjectHref, getEcosystemTransferHref } from "@/lib/ecosystem/apps";
 import { resolveActiveProjectId } from "@/lib/ecosystem/project-context";
+import { createNotebookDocument, fetchNotebookDocuments, updateNotebookDocument, type NotebookDocumentPayload } from "@/lib/notebook";
+import { ensureNotebookGuestSession } from "@/lib/auth";
 
 type BlockKind = "text" | "formula" | "code" | "graph" | "table" | "result";
 type SaveState = "saved" | "saving";
@@ -66,6 +70,39 @@ type NotebookBlock = {
     content: string;
     scientific_object_reference?: ScientificObjectReference;
 };
+
+function toApiNotebookBlock(block: NotebookBlock): ApiNotebookBlock {
+    const family: ApiNotebookBlock["family"] = ["code", "graph", "table"].includes(block.kind)
+        ? "compute"
+        : block.kind === "result"
+            ? "import"
+            : block.kind === "formula"
+                ? "math"
+                : "document";
+    return {
+        id: block.id,
+        kind: block.kind,
+        title: block.title || block.kind,
+        content: block.content,
+        family,
+        config: {},
+        execution: { status: "idle", runtime: "local" },
+        scientific_object_reference: block.scientific_object_reference,
+    };
+}
+
+function fromApiNotebookBlock(block: ApiNotebookBlock): NotebookBlock {
+    const kind: BlockKind = ["text", "formula", "code", "graph", "table", "result"].includes(block.kind)
+        ? block.kind as BlockKind
+        : "result";
+    return {
+        id: block.id,
+        kind,
+        title: block.title,
+        content: block.content,
+        scientific_object_reference: block.scientific_object_reference,
+    };
+}
 
 const blockCatalog: Array<{
     kind: BlockKind;
@@ -210,17 +247,109 @@ export function NotebookWorkspace() {
     const [outlineOpen, setOutlineOpen] = React.useState(false);
     const [menuBlockId, setMenuBlockId] = React.useState<string | null>(null);
     const [draggingId, setDraggingId] = React.useState<string | null>(null);
+    const [backendDocumentId, setBackendDocumentId] = React.useState<string | null>(null);
     const historyHydratedRef = React.useRef(false);
+    const saveTimerRef = React.useRef<number | null>(null);
+    const notebookStateRef = React.useRef({ blocks, documentTitle, pageTitle, executionTarget, backendDocumentId });
+    notebookStateRef.current = { blocks, documentTitle, pageTitle, executionTarget, backendDocumentId };
+
+    const persistNotebook = React.useCallback(async () => {
+        try {
+            await ensureNotebookGuestSession();
+            const current = notebookStateRef.current;
+            const payload: NotebookDocumentPayload = {
+                title: current.documentTitle,
+                summary: current.pageTitle,
+                visibility: "private",
+                blocks: current.blocks.map(toApiNotebookBlock),
+                metadata: {
+                    schema_version: 1,
+                    source: "notebook-workspace-v1",
+                    execution_target: current.executionTarget,
+                },
+            };
+            const saved = current.backendDocumentId
+                ? await updateNotebookDocument(current.backendDocumentId, payload)
+                : await createNotebookDocument(payload);
+            setBackendDocumentId(saved.id);
+            window.localStorage.setItem("axion-notebook-backend-document-id", saved.id);
+            setSaveState("saved");
+        } catch (error) {
+            setSaveState("saved");
+            setExecutionMessage(error instanceof Error ? `Local copy kept; server save failed: ${error.message}` : "Local copy kept; server save failed.");
+        }
+    }, []);
 
     const touch = React.useCallback(() => {
         setSaveState("saving");
-        window.setTimeout(() => setSaveState("saved"), 650);
+        if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = window.setTimeout(() => {
+            void persistNotebook();
+        }, 900);
+    }, [persistNotebook]);
+
+    React.useEffect(() => {
+        let alive = true;
+        void ensureNotebookGuestSession()
+            .then(() => fetchNotebookDocuments())
+            .then((documents) => {
+                if (!alive || !documents.length) return;
+                const storedId = window.localStorage.getItem("axion-notebook-backend-document-id");
+                const document = documents.find((item: { id: string }) => item.id === storedId) || documents[0];
+                if (!document) return;
+                setBackendDocumentId(document.id);
+                setDocumentTitle(document.title);
+                setPageTitle(document.summary || "Research Notebook");
+                setBlocks(document.blocks.map(fromApiNotebookBlock));
+                window.localStorage.setItem("axion-notebook-backend-document-id", document.id);
+            })
+            .catch(() => undefined);
+        return () => {
+            alive = false;
+        };
     }, []);
 
     React.useEffect(() => {
         const searchParams = new URLSearchParams(window.location.search);
         const objectId = searchParams.get("objectId");
-        if (!objectId || searchParams.get("source") !== "project") return;
+        const transferId = searchParams.get("transferId");
+        const source = searchParams.get("source");
+        if (source === "transfer" && transferId) {
+            void fetchScientificObjectTransfer(transferId)
+                .then(async (transfer) => {
+                    const object = await importLocalScientificObject(transfer.payload);
+                    await discardScientificObjectTransfer(transferId);
+                    return object;
+                })
+                .then((object) => {
+                    if (!object?.revision?.payload || typeof object.revision.payload !== "object") return;
+                    const payload = object.revision.payload as Record<string, unknown>;
+                    const report = typeof payload.report_markdown === "string" ? payload.report_markdown : "";
+                    const summary = typeof payload.summary === "string" ? payload.summary : "";
+                    const content = report.trim() || summary.trim() || JSON.stringify(payload, null, 2);
+                    const scientificObjectReference: ScientificObjectReference = {
+                        projectId: object.projectId,
+                        objectId: object.id,
+                        mode: "pinned",
+                        revision: object.currentRevision,
+                    };
+                    void createLocalScientificReference({
+                        projectId: object.projectId,
+                        reference: scientificObjectReference,
+                        containerObjectId: "notebook-workspace:local",
+                        role: "notebook-result-source",
+                    });
+                    setBlocks((current) => current.some((block) => block.id === `scientific-object-${object.id}`)
+                        ? current
+                        : [...current, { id: `scientific-object-${object.id}`, kind: "result", title: object.title, content, scientific_object_reference: scientificObjectReference }]);
+                    setPageTitle(object.title);
+                    setActiveBlockId(`scientific-object-${object.id}`);
+                    touch();
+                })
+                .catch((error) => setExecutionMessage(error instanceof Error ? error.message : "Scientific Object transfer failed."));
+            return;
+        }
+        if (!objectId || source !== "project") return;
         void getLocalScientificObject(objectId).then((object) => {
             if (!object?.revision?.payload || typeof object.revision.payload !== "object") return;
             const payload = object.revision.payload as Record<string, unknown>;
@@ -308,6 +437,7 @@ export function NotebookWorkspace() {
     }, [blocks, documentTitle, pageTitle]);
 
     React.useEffect(() => () => {
+        if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
         if (kernelAdapterRef.current?.dispose) void kernelAdapterRef.current.dispose();
     }, []);
 
@@ -420,7 +550,12 @@ export function NotebookWorkspace() {
                         finishedAt: new Date().toISOString(),
                     },
                 });
-                window.location.href = getEcosystemObjectHref("writer", projectId, object.id);
+                try {
+                    const transfer = await publishScientificObjectTransfer(await exportLocalScientificObject(object.id));
+                    window.location.href = getEcosystemTransferHref("writer", transfer.transferId, projectId);
+                } catch {
+                    window.location.href = getEcosystemObjectHref("writer", projectId, object.id);
+                }
             } catch (error) {
                 setExecutionMessage(error instanceof Error ? error.message : "Writer handoff failed.");
             }
