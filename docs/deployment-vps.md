@@ -97,6 +97,22 @@ Then restart backend and worker:
 docker compose -f docker-compose.prod.yml restart backend worker
 ```
 
+For the systemd/PostgreSQL deployment, install the versioned backup script and
+timer from `ops/`:
+
+```bash
+install -m 755 ops/backup-postgres.sh /root/projects/Notebook/ops/backup-postgres.sh
+install -m 644 ops/axion-notebook-postgres-backup.service /etc/systemd/system/
+install -m 644 ops/axion-notebook-postgres-backup.timer /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now axion-notebook-postgres-backup.timer
+systemctl start axion-notebook-postgres-backup.service
+```
+
+Backups are written with mode `0700` under `/var/backups/axion-notebook`,
+hashed with SHA-256, and retained for 14 days. A restore drill must be run
+against a separate database before public production.
+
 ## 7. Upgrade flow
 
 ```bash

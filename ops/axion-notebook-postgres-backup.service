@@ -1,0 +1,12 @@
+[Unit]
+Description=Axion Notebook PostgreSQL backup
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+EnvironmentFile=/root/projects/Notebook/backend/.env
+Environment=BACKUP_DIR=/var/backups/axion-notebook
+Environment=SERVICE_NAME=axion-notebook
+ExecStart=/root/projects/Notebook/ops/backup-postgres.sh
