@@ -22,6 +22,11 @@ def sample_blocks(content="sin(x)"):
 
 
 class NotebookPermissionTests(APITestCase):
+    def test_health_probe(self):
+        response = self.client.get("/healthz/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["status"], "ok")
+
     def setUp(self):
         self.owner = User.objects.create_user(username="owner", password="owner-pass")
         self.public_doc = NotebookDocument.objects.create(

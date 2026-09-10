@@ -1,0 +1,15 @@
+[Unit]
+Description=Axion Notebook backend
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/projects/Notebook/backend
+EnvironmentFile=-/root/projects/Notebook/backend/.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/root/projects/Notebook/backend/.venv/bin/gunicorn project.wsgi:application --bind 0.0.0.0:8006 --workers 2 --timeout 120
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

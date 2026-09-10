@@ -7,7 +7,10 @@ from rest_framework_simplejwt.views import (
 from django.conf import settings
 from django.conf.urls.static import static
 
+from notebook.views import healthz
+
 urlpatterns = [
+    path('healthz/', healthz, name='healthz'),
     path('admin/', admin.site.urls),
     path('api/notebook/', include('notebook.urls')),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),

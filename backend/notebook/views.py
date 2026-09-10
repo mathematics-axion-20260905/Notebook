@@ -10,6 +10,7 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
+from django.http import JsonResponse
 from django.utils import timezone
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
@@ -393,3 +394,8 @@ class BootstrapDemoUserView(APIView):
                 "refresh": str(refresh),
             }
         )
+
+
+def healthz(request):
+    """Small unauthenticated probe for the service manager and load balancer."""
+    return JsonResponse({"status": "ok", "service": "notebook-backend"})
