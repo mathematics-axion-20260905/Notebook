@@ -25,3 +25,8 @@ export function getEcosystemHref(app: EcosystemApp, _currentApp: EcosystemApp, p
   const separator = base.includes("?") ? "&" : "?";
   return `${base}${separator}project=${encodeURIComponent(projectId)}`;
 }
+
+export function getEcosystemObjectHref(app: EcosystemApp, projectId: string, objectId: string): string {
+  const base = app === "writer" ? "/new" : configuredUrls[app];
+  return `${base}${base.includes("?") ? "&" : "?"}source=project&project=${encodeURIComponent(projectId)}&objectId=${encodeURIComponent(objectId)}`;
+}

@@ -3,6 +3,7 @@ import { Manrope, Playfair_Display } from "next/font/google";
 
 import "./theme.css";
 import "@/styles/axion-science-tokens.css";
+import "@/styles/axion-ecosystem-shell.css";
 import "@/styles/axion-premium-landing.css";
 import "@/styles/axion-notebook-chrome.css";
 import "@/styles/axion-premium-workspace.css";
@@ -19,7 +20,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
     return (
-        <html lang="en" suppressHydrationWarning>
+        <html lang="uz" suppressHydrationWarning>
             <body className={`${manrope.variable} ${playfair.variable} min-h-screen`}>
                 <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
                     <EcosystemBar currentApp="notebook" />

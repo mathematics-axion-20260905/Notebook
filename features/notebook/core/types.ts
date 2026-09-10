@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import type { ScientificObjectReference } from "@/lib/ecosystem/contracts";
 
 export type NotebookBlockFamily =
     | "document"
@@ -30,9 +31,17 @@ export type NotebookExecutionStatus =
     | "error"
     | "stale";
 
+export type NotebookExecutionTarget =
+    | "this-device"
+    | "jupyter-kernel"
+    | "external-server"
+    | "hpc-cluster";
+
 export type NotebookExecutionState = {
     status: NotebookExecutionStatus;
     runtime: "local" | "hybrid" | "server-boundary";
+    target?: NotebookExecutionTarget;
+    kernelId?: string;
     cacheKey?: string;
     detail?: string;
     durationMs?: number;
@@ -51,6 +60,7 @@ export type NotebookBlock = {
     family: NotebookBlockFamily;
     config: NotebookBlockConfig;
     execution: NotebookExecutionState;
+    scientific_object_reference?: ScientificObjectReference;
 };
 
 export type NotebookDocument = {

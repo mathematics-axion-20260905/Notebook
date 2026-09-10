@@ -50,6 +50,10 @@ function normalizeBlock(payload: Record<string, unknown>): NotebookBlock | null 
 
     const config = typeof payload.config === "object" && payload.config ? payload.config as Record<string, string> : {};
     const metadata = typeof payload.metadata === "object" && payload.metadata ? payload.metadata as Record<string, unknown> : {};
+    const scientificObjectReference = typeof payload.scientific_object_reference === "object" && payload.scientific_object_reference
+        ? payload.scientific_object_reference as NotebookBlock["scientific_object_reference"]
+        : undefined;
+    const execution = typeof payload.execution === "object" && payload.execution ? payload.execution as Record<string, unknown> : {};
 
     return {
         id: payload.id,
@@ -58,9 +62,18 @@ function normalizeBlock(payload: Record<string, unknown>): NotebookBlock | null 
         title: payload.title,
         content: payload.content,
         config,
+        scientific_object_reference: scientificObjectReference,
         execution: {
-            status: typeof metadata.execution_status === "string" ? metadata.execution_status as NotebookBlock["execution"]["status"] : "idle",
-            runtime: typeof metadata.execution_runtime === "string" ? metadata.execution_runtime as NotebookBlock["execution"]["runtime"] : "local",
+            status: typeof execution.status === "string" ? execution.status as NotebookBlock["execution"]["status"] : typeof metadata.execution_status === "string" ? metadata.execution_status as NotebookBlock["execution"]["status"] : "idle",
+            runtime: typeof execution.runtime === "string" ? execution.runtime as NotebookBlock["execution"]["runtime"] : typeof metadata.execution_runtime === "string" ? metadata.execution_runtime as NotebookBlock["execution"]["runtime"] : "local",
+            target: typeof execution.target === "string" ? execution.target as NotebookBlock["execution"]["target"] : undefined,
+            kernelId: typeof execution.kernelId === "string" ? execution.kernelId : undefined,
+            cacheKey: typeof execution.cacheKey === "string" ? execution.cacheKey : undefined,
+            detail: typeof execution.detail === "string" ? execution.detail : undefined,
+            durationMs: typeof execution.durationMs === "number" ? execution.durationMs : undefined,
+            updatedAt: typeof execution.updatedAt === "string" ? execution.updatedAt : undefined,
+            output: typeof execution.output === "object" && execution.output ? execution.output as Record<string, unknown> : undefined,
+            error: typeof execution.error === "string" ? execution.error : undefined,
         },
     };
 }
@@ -202,6 +215,8 @@ export async function executeNotebookBlock(documentId: string | null, block: Not
             title: block.title,
             content: block.content,
             config: block.config,
+            execution_target: block.execution.target,
+            scientific_object_reference: block.scientific_object_reference,
         }),
     });
     if (!response.ok) throw new Error(await parseApiError(response));

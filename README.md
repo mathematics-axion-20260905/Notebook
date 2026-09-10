@@ -68,6 +68,13 @@ Anonymous users can read only notebooks marked `public_read`. Write, execute, ch
 - compute submissions create queued `NotebookExecutionJob` records
 - the worker processes jobs and writes `NotebookExecutionRecord` history
 - stale blocks never auto-run downstream execution
+- Python execution is selected through `features/notebook/core/jupyter-adapter.ts`:
+  - `this-device` uses the existing Pyodide dependency in the browser;
+  - `jupyter-kernel` speaks the standard Jupyter Server kernel REST/WebSocket protocol;
+  - `external-server` and `hpc-cluster` remain explicit backend targets, not hidden fallbacks.
+- Jupyter owns the kernel/session. Notebook owns the document, Project/Object reference, provenance, and execution history.
+
+For a local or hosted Jupyter Server, set `NEXT_PUBLIC_JUPYTER_URL` and optionally `NEXT_PUBLIC_JUPYTER_TOKEN` / `NEXT_PUBLIC_JUPYTER_KERNEL`. Without it, the workspace uses browser-local Pyodide. The token is intentionally an explicit deployment choice and should only be exposed when the Jupyter endpoint is protected for that client.
 
 ## Production deployment
 

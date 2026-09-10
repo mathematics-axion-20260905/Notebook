@@ -327,7 +327,12 @@ class NotebookExecutionSubmitView(APIView):
             block_id=payload["block_id"],
             block_kind=payload["kind"],
             title=payload.get("title", ""),
-            inputs={"content": payload["content"], "config": payload.get("config", {})},
+            inputs={
+                "content": payload["content"],
+                "config": payload.get("config", {}),
+                "execution_target": payload.get("execution_target", "external-server"),
+                "scientific_object_reference": payload.get("scientific_object_reference"),
+            },
             timeout_seconds=MAX_EXECUTION_TIMEOUT_SECONDS,
         )
         if request.query_params.get("sync") == "1":

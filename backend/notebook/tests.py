@@ -101,6 +101,39 @@ class NotebookMutationTests(APITestCase):
         restored_blocks = restore_response.json()["blocks"]
         self.assertEqual(restored_blocks[0]["content"], "sin(x)")
 
+    def test_scientific_object_reference_survives_document_save(self):
+        blocks = [
+            {
+                "id": "result-1",
+                "kind": "result",
+                "title": "Math result",
+                "content": "A pinned result",
+                "scientific_object_reference": {
+                    "projectId": "project-1",
+                    "objectId": "object-1",
+                    "mode": "pinned",
+                    "revision": 2,
+                },
+            },
+        ]
+        response = self.client.put(
+            f"/api/notebook/documents/{self.document.public_id}/",
+            {
+                "title": self.document.title,
+                "summary": self.document.summary,
+                "visibility": self.document.visibility,
+                "blocks": blocks,
+                "metadata": {"schema_version": 1},
+                "is_locked": False,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        reference = response.json()["blocks"][0]["scientific_object_reference"]
+        self.assertEqual(reference["objectId"], "object-1")
+        self.assertEqual(reference["revision"], 2)
+
     def test_execution_submission_is_queued_and_worker_processes_job(self):
         response = self.client.post(
             "/api/notebook/execution/submit/",
@@ -111,6 +144,13 @@ class NotebookMutationTests(APITestCase):
                 "title": "Integral",
                 "content": "sin(x)",
                 "config": {"variable": "x", "lower": "0", "upper": "1", "method": "auto"},
+                "execution_target": "external-server",
+                "scientific_object_reference": {
+                    "projectId": "project-1",
+                    "objectId": "object-1",
+                    "mode": "pinned",
+                    "revision": 2,
+                },
             },
             format="json",
         )
@@ -118,6 +158,8 @@ class NotebookMutationTests(APITestCase):
         job_id = response.json()["id"]
         job = NotebookExecutionJob.objects.get(public_id=job_id)
         self.assertEqual(job.status, NotebookExecutionJob.STATUS_QUEUED)
+        self.assertEqual(job.inputs["execution_target"], "external-server")
+        self.assertEqual(job.inputs["scientific_object_reference"]["objectId"], "object-1")
 
         call_command("process_execution_jobs", "--once")
 

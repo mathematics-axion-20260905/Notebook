@@ -41,15 +41,30 @@ import {
 } from "recharts";
 
 import { LaboratoryInlineMathMarkdown } from "@/components/laboratory/laboratory-inline-math-markdown";
+import { createLocalScientificObject, createLocalScientificReference, getLocalScientificObject } from "@/lib/ecosystem/local-object-store";
+import type { ScientificObjectReference } from "@/lib/ecosystem/contracts";
+import { createNotebookKernelAdapter, type NotebookKernelAdapter } from "@/features/notebook/core/jupyter-adapter";
+import type { NotebookExecutionTarget } from "@/features/notebook/core/types";
+import { getEcosystemObjectHref } from "@/lib/ecosystem/apps";
+import { resolveActiveProjectId } from "@/lib/ecosystem/project-context";
 
 type BlockKind = "text" | "formula" | "code" | "graph" | "table" | "result";
 type SaveState = "saved" | "saving";
+type NotebookHistoryItem = {
+    id: string;
+    documentTitle: string;
+    pageTitle: string;
+    blocks: NotebookBlock[];
+    createdAt: string;
+    signature: string;
+};
 
 type NotebookBlock = {
     id: string;
     kind: BlockKind;
     title?: string;
     content: string;
+    scientific_object_reference?: ScientificObjectReference;
 };
 
 const blockCatalog: Array<{
@@ -115,6 +130,60 @@ function createBlock(kind: BlockKind): NotebookBlock {
     return { id, kind, content: "Add a result, interpretation, or conclusion." };
 }
 
+function notebookToMarkdown(title: string, pageTitle: string, blocks: NotebookBlock[]) {
+    const sections = blocks.map((block) => {
+        if (block.kind === "formula") return `$$\n${block.content}\n$$`;
+        if (block.kind === "code") return `\`\`\`python\n${block.content}\n\`\`\``;
+        if (block.kind === "graph") return `### ${block.title || "Graph"}\n\n\`\`\`plot2d\n${JSON.stringify({ expression: block.content, title: block.title || "Graph" }, null, 2)}\n\`\`\``;
+        if (block.kind === "table") return `### ${block.title || "Table"}\n\n${block.content.split(/\r?\n/).map((row) => `| ${row.split(",").join(" | ")} |`).join("\n")}`;
+        if (block.kind === "result") return `> **Result.** ${block.content}`;
+        return block.content;
+    });
+    return `# ${title}\n\n## ${pageTitle}\n\n${sections.join("\n\n")}`.trim() + "\n";
+}
+
+function notebookToIpynb(title: string, blocks: NotebookBlock[]) {
+    return JSON.stringify({
+        cells: blocks.map((block) => ({
+            cell_type: block.kind === "code" ? "code" : "markdown",
+            execution_count: null,
+            metadata: {
+                axion_block_id: block.id,
+                axion_block_kind: block.kind,
+                scientific_object_reference: block.scientific_object_reference,
+            },
+            outputs: [],
+            source: (block.kind === "formula" ? `$$\n${block.content}\n$$` : block.content).split("\n").flatMap((line, index, lines) => index < lines.length - 1 ? [`${line}\n`] : [line]),
+        })),
+        metadata: {
+            kernelspec: { display_name: "Python 3", language: "python", name: "python3" },
+            language_info: { name: "python" },
+            axion_notebook: { schema_version: "1.0", title },
+        },
+        nbformat: 4,
+        nbformat_minor: 5,
+    }, null, 2);
+}
+
+function notebookToLatex(title: string, pageTitle: string, blocks: NotebookBlock[]) {
+    const body = blocks.map((block) => {
+        if (block.kind === "formula") return `\\[${block.content}\\]`;
+        if (block.kind === "code") return `\\begin{verbatim}\n${block.content}\n\\end{verbatim}`;
+        return block.content;
+    }).join("\n\n");
+    return `\\documentclass{article}\n\\usepackage{amsmath}\n\\title{${title}}\n\\begin{document}\n\\maketitle\n\\section*{${pageTitle}}\n${body}\n\\end{document}\n`;
+}
+
+function downloadNotebookFile(filename: string, content: string, mediaType = "text/plain;charset=utf-8") {
+    const blob = new Blob([content], { type: mediaType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 export function NotebookWorkspace() {
     const { theme, setTheme } = useTheme();
     const [blocks, setBlocks] = React.useState<NotebookBlock[]>(starterBlocks);
@@ -122,22 +191,62 @@ export function NotebookWorkspace() {
     const [pageTitle, setPageTitle] = React.useState("Heat Equation");
     const [saveState, setSaveState] = React.useState<SaveState>("saved");
     const [running, setRunning] = React.useState(false);
+    const [executionMessage, setExecutionMessage] = React.useState<string | null>(null);
+    const jupyterConfigured = Boolean(process.env.NEXT_PUBLIC_JUPYTER_URL);
+    const [executionTarget, setExecutionTarget] = React.useState<NotebookExecutionTarget>(
+        jupyterConfigured ? "jupyter-kernel" : "this-device",
+    );
+    const kernelAdapterRef = React.useRef<NotebookKernelAdapter | null>(null);
     const [activeBlockId, setActiveBlockId] = React.useState<string | null>("graph");
     const [insertIndex, setInsertIndex] = React.useState<number | null>(2);
     const [commandOpen, setCommandOpen] = React.useState(false);
     const [commandSearch, setCommandSearch] = React.useState("");
     const [shareOpen, setShareOpen] = React.useState(false);
+    const [shareLink, setShareLink] = React.useState("");
     const [historyOpen, setHistoryOpen] = React.useState(false);
+    const [historyItems, setHistoryItems] = React.useState<NotebookHistoryItem[]>([]);
     const [exportOpen, setExportOpen] = React.useState(false);
     const [moreOpen, setMoreOpen] = React.useState(false);
     const [outlineOpen, setOutlineOpen] = React.useState(false);
     const [menuBlockId, setMenuBlockId] = React.useState<string | null>(null);
     const [draggingId, setDraggingId] = React.useState<string | null>(null);
+    const historyHydratedRef = React.useRef(false);
 
     const touch = React.useCallback(() => {
         setSaveState("saving");
         window.setTimeout(() => setSaveState("saved"), 650);
     }, []);
+
+    React.useEffect(() => {
+        const searchParams = new URLSearchParams(window.location.search);
+        const objectId = searchParams.get("objectId");
+        if (!objectId || searchParams.get("source") !== "project") return;
+        void getLocalScientificObject(objectId).then((object) => {
+            if (!object?.revision?.payload || typeof object.revision.payload !== "object") return;
+            const payload = object.revision.payload as Record<string, unknown>;
+            const report = typeof payload.report_markdown === "string" ? payload.report_markdown : "";
+            const summary = typeof payload.summary === "string" ? payload.summary : "";
+            const content = report.trim() || summary.trim() || JSON.stringify(payload, null, 2);
+            const scientificObjectReference: ScientificObjectReference = {
+                projectId: object.projectId,
+                objectId: object.id,
+                mode: "pinned",
+                revision: object.currentRevision,
+            };
+            void createLocalScientificReference({
+                projectId: object.projectId,
+                reference: scientificObjectReference,
+                containerObjectId: "notebook-workspace:local",
+                role: "notebook-result-source",
+            });
+            setBlocks((current) => current.some((block) => block.id === `scientific-object-${object.id}`)
+                ? current
+                : [...current, { id: `scientific-object-${object.id}`, kind: "result", title: object.title, content, scientific_object_reference: scientificObjectReference }]);
+            setPageTitle(object.title);
+            setActiveBlockId(`scientific-object-${object.id}`);
+            touch();
+        }).catch(() => undefined);
+    }, [touch]);
 
     React.useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
@@ -159,6 +268,73 @@ export function NotebookWorkspace() {
         return () => window.removeEventListener("keydown", onKeyDown);
     }, []);
 
+    React.useEffect(() => {
+        setShareLink(window.location.href);
+        try {
+            const raw = window.localStorage.getItem("axion-notebook-history-v1");
+            const parsed = raw ? JSON.parse(raw) : [];
+            setHistoryItems(Array.isArray(parsed) ? parsed.slice(0, 12) : []);
+        } catch {
+            setHistoryItems([]);
+        } finally {
+            historyHydratedRef.current = true;
+        }
+    }, []);
+
+    React.useEffect(() => {
+        if (!historyHydratedRef.current) return;
+        window.localStorage.setItem("axion-notebook-history-v1", JSON.stringify(historyItems.slice(0, 12)));
+    }, [historyItems]);
+
+    React.useEffect(() => {
+        const signature = JSON.stringify({ documentTitle, pageTitle, blocks });
+        const timer = window.setTimeout(() => {
+            setHistoryItems((current) => {
+                if (current[0]?.signature === signature) return current;
+                return [
+                    {
+                        id: crypto.randomUUID(),
+                        documentTitle,
+                        pageTitle,
+                        blocks,
+                        createdAt: new Date().toISOString(),
+                        signature,
+                    },
+                    ...current,
+                ].slice(0, 12);
+            });
+        }, 1800);
+        return () => window.clearTimeout(timer);
+    }, [blocks, documentTitle, pageTitle]);
+
+    React.useEffect(() => () => {
+        if (kernelAdapterRef.current?.dispose) void kernelAdapterRef.current.dispose();
+    }, []);
+
+    const getKernelAdapter = React.useCallback(() => {
+        if (executionTarget !== "this-device" && executionTarget !== "jupyter-kernel") {
+            throw new Error(`EXECUTION_TARGET_NOT_CONFIGURED:${executionTarget}`);
+        }
+        if (executionTarget === "jupyter-kernel" && !jupyterConfigured) {
+            throw new Error("JUPYTER_SERVER_NOT_CONFIGURED");
+        }
+        if (!kernelAdapterRef.current || kernelAdapterRef.current.target !== executionTarget) {
+            if (kernelAdapterRef.current?.dispose) void kernelAdapterRef.current.dispose();
+            kernelAdapterRef.current = createNotebookKernelAdapter(executionTarget, {
+                jupyter: executionTarget === "jupyter-kernel" ? {
+                    baseUrl: process.env.NEXT_PUBLIC_JUPYTER_URL || "",
+                    token: process.env.NEXT_PUBLIC_JUPYTER_TOKEN,
+                    kernelName: process.env.NEXT_PUBLIC_JUPYTER_KERNEL || "python3",
+                } : undefined,
+                pyodide: {
+                    indexURL: process.env.NEXT_PUBLIC_PYODIDE_INDEX_URL,
+                    loadPackagesFromImports: true,
+                },
+            });
+        }
+        return kernelAdapterRef.current;
+    }, [executionTarget, jupyterConfigured]);
+
     const updateBlock = (id: string, patch: Partial<NotebookBlock>) => {
         setBlocks((current) => current.map((block) => (block.id === id ? { ...block, ...patch } : block)));
         touch();
@@ -179,6 +355,78 @@ export function NotebookWorkspace() {
         if (activeBlockId === id) setActiveBlockId(null);
         setMenuBlockId(null);
         touch();
+    };
+
+    const restoreHistoryItem = (item: NotebookHistoryItem) => {
+        setBlocks(item.blocks);
+        setDocumentTitle(item.documentTitle);
+        setPageTitle(item.pageTitle);
+        setHistoryOpen(false);
+        setExecutionMessage(`Restored ${new Date(item.createdAt).toLocaleTimeString()}.`);
+        touch();
+    };
+
+    const handleExport = async (format: string) => {
+        setExportOpen(false);
+        const markdown = notebookToMarkdown(documentTitle, pageTitle, blocks);
+        if (format === "Markdown") {
+            downloadNotebookFile(`${documentTitle.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "notebook"}.md`, markdown);
+            setExecutionMessage("Markdown export downloaded.");
+            return;
+        }
+        if (format === "LaTeX") {
+            downloadNotebookFile(`${documentTitle.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "notebook"}.tex`, notebookToLatex(documentTitle, pageTitle, blocks));
+            setExecutionMessage("LaTeX export downloaded.");
+            return;
+        }
+        if (format === "Notebook JSON") {
+            downloadNotebookFile(`${documentTitle.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "notebook"}.json`, JSON.stringify({ schemaVersion: "1.0", documentTitle, pageTitle, blocks, exportedAt: new Date().toISOString() }, null, 2), "application/json;charset=utf-8");
+            setExecutionMessage("Notebook JSON export downloaded.");
+            return;
+        }
+        if (format === "Jupyter .ipynb") {
+            downloadNotebookFile(`${documentTitle.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "notebook"}.ipynb`, notebookToIpynb(documentTitle, blocks), "application/json;charset=utf-8");
+            setExecutionMessage("Jupyter notebook export downloaded.");
+            return;
+        }
+        if (format === "Writer") {
+            const projectId = resolveActiveProjectId();
+            if (!projectId) {
+                setExecutionMessage("Open this notebook from a Project before sending it to Writer.");
+                return;
+            }
+            try {
+                const object = await createLocalScientificObject({
+                    projectId,
+                    kind: "notebook",
+                    domain: "notebook",
+                    title: `${documentTitle} · ${pageTitle}`,
+                    sourceApp: "notebook",
+                    payload: {
+                        type: "notebook",
+                        schemaVersion: "1.0",
+                        documentTitle,
+                        pageTitle,
+                        blocks,
+                        report_markdown: markdown,
+                        summary: `Notebook with ${blocks.length} scientific blocks.`,
+                    },
+                    provenance: {
+                        sourceApp: "notebook",
+                        engine: "Axion Notebook",
+                        engineVersion: "workspace-v1",
+                        executionTarget,
+                        inputs: { blockCount: blocks.length },
+                        finishedAt: new Date().toISOString(),
+                    },
+                });
+                window.location.href = getEcosystemObjectHref("writer", projectId, object.id);
+            } catch (error) {
+                setExecutionMessage(error instanceof Error ? error.message : "Writer handoff failed.");
+            }
+            return;
+        }
+        setExecutionMessage(`${format} export will be connected to the render pipeline.`);
     };
 
     const duplicateBlock = (id: string) => {
@@ -206,9 +454,84 @@ export function NotebookWorkspace() {
         touch();
     };
 
-    const runNotebook = () => {
+    const runNotebook = async () => {
+        const codeBlock = blocks.find((block) => block.kind === "code");
+        if (!codeBlock) {
+            setExecutionMessage("Add a Python code block first.");
+            return;
+        }
         setRunning(true);
-        window.setTimeout(() => setRunning(false), 900);
+        setExecutionMessage(executionTarget === "jupyter-kernel" ? "Connecting to Jupyter kernel…" : "Starting local Pyodide kernel…");
+        try {
+            const adapter = getKernelAdapter();
+            const execution = await adapter.execute(codeBlock.content);
+            if (execution.status === "error") {
+                setExecutionMessage(execution.output.errors?.[0]?.evalue || "Kernel execution failed.");
+                return;
+            }
+
+            const projectId = resolveActiveProjectId();
+            const outputText = execution.output.text || (execution.output.displayData?.length ? JSON.stringify(execution.output.displayData, null, 2) : "Execution completed without a displayed value.");
+            let scientificObjectReference: ScientificObjectReference | undefined;
+            if (projectId) {
+                const object = await createLocalScientificObject({
+                    projectId,
+                    kind: "calculation",
+                    domain: "notebook",
+                    title: `${codeBlock.title || "Python"} execution`,
+                    sourceApp: "notebook",
+                    payload: {
+                        type: "notebook-execution",
+                        language: "python",
+                        code: codeBlock.content,
+                        output: execution.output,
+                        runtime: execution.runtime,
+                        execution_target: execution.target,
+                        kernel_id: execution.kernelId,
+                        duration_ms: execution.durationMs,
+                    },
+                    provenance: {
+                        sourceApp: "notebook",
+                        engine: execution.target === "jupyter-kernel" ? "Jupyter Kernel" : "Pyodide",
+                        engineVersion: execution.target === "jupyter-kernel" ? "configured-server" : "0.29.3",
+                        executionTarget: execution.target,
+                        inputs: { blockId: codeBlock.id },
+                        parameters: { runtimeMs: execution.durationMs, kernelId: execution.kernelId },
+                        finishedAt: new Date().toISOString(),
+                    },
+                });
+                scientificObjectReference = {
+                    projectId: object.projectId,
+                    objectId: object.id,
+                    mode: "pinned",
+                    revision: object.currentRevision,
+                };
+                await createLocalScientificReference({
+                    projectId,
+                    reference: scientificObjectReference,
+                    containerObjectId: "notebook-workspace:local",
+                    role: "notebook-execution-result",
+                });
+            }
+
+            const resultBlock: NotebookBlock = {
+                id: `result-${crypto.randomUUID()}`,
+                kind: "result",
+                title: `${codeBlock.title || "Python"} result`,
+                content: outputText,
+                scientific_object_reference: scientificObjectReference,
+            };
+            setBlocks((current) => [...current, resultBlock]);
+            setActiveBlockId(resultBlock.id);
+            setExecutionMessage(projectId
+                ? `Executed on ${execution.target}; saved as a Scientific Object.`
+                : `Executed on ${execution.target}. Open this notebook from a Project to save the result object.`);
+            touch();
+        } catch (error) {
+            setExecutionMessage(error instanceof Error ? error.message : "Kernel execution failed.");
+        } finally {
+            setRunning(false);
+        }
     };
 
     const reorderOnDrop = (targetId: string) => {
@@ -262,10 +585,32 @@ export function NotebookWorkspace() {
                     </div>
 
                     <div className="flex flex-1 items-center justify-end gap-1.5">
+                        <label className="hidden items-center gap-1.5 rounded-[11px] border border-black/[0.07] bg-black/[0.025] px-2.5 py-2 text-[10px] font-semibold text-black/48 dark:border-white/[0.09] dark:bg-white/[0.04] dark:text-white/45 sm:flex">
+                            <span className="hidden lg:inline">Kernel</span>
+                            <select
+                                aria-label="Execution target"
+                                value={executionTarget}
+                                disabled={running}
+                                onChange={(event) => {
+                                    const nextTarget = event.target.value as NotebookExecutionTarget;
+                                    setExecutionTarget(nextTarget);
+                                    setExecutionMessage(nextTarget === "jupyter-kernel" && !jupyterConfigured
+                                        ? "Configure NEXT_PUBLIC_JUPYTER_URL first."
+                                        : null);
+                                }}
+                                className="max-w-[112px] cursor-pointer bg-transparent text-[10px] font-bold text-black/70 outline-none dark:text-white/70"
+                            >
+                                <option value="this-device">This device</option>
+                                <option value="jupyter-kernel" disabled={!jupyterConfigured}>Jupyter kernel{jupyterConfigured ? "" : " · setup needed"}</option>
+                                <option value="external-server" disabled>External server · next</option>
+                                <option value="hpc-cluster" disabled>HPC cluster · next</option>
+                            </select>
+                        </label>
                         <button onClick={runNotebook} className="notebook-toolbar-button">
                             <Play className={`h-3.5 w-3.5 ${running ? "animate-pulse" : ""}`} />
                             <span className="hidden sm:inline">{running ? "Running" : "Run"}</span>
                         </button>
+                        {executionMessage ? <span className="hidden max-w-[240px] truncate text-[10px] font-semibold text-black/40 dark:text-white/40 xl:inline">{executionMessage}</span> : null}
                         <button onClick={() => setShareOpen(true)} className="notebook-toolbar-button">
                             <Share2 className="h-3.5 w-3.5" />
                             <span className="hidden sm:inline">Share</span>
@@ -446,8 +791,15 @@ export function NotebookWorkspace() {
                             <button onClick={() => setShareOpen(false)} className="notebook-icon-button"><X className="h-4 w-4" /></button>
                         </div>
                         <div className="mt-6 flex items-center gap-2 rounded-[14px] border border-black/[0.08] bg-black/[0.025] p-2 dark:border-white/[0.09] dark:bg-white/[0.04]">
-                            <div className="min-w-0 flex-1 truncate px-2 text-xs text-black/45 dark:text-white/42">notebook.axion.app/demo/heat-equation</div>
-                            <button className="rounded-[10px] bg-black px-3 py-2 text-xs font-bold text-white dark:bg-white dark:text-black">Copy link</button>
+                            <div className="min-w-0 flex-1 truncate px-2 text-xs text-black/45 dark:text-white/42">{shareLink || "Current workspace"}</div>
+                            <button
+                                onClick={() => {
+                                    const link = shareLink || window.location.href;
+                                    void navigator.clipboard?.writeText(link);
+                                    setExecutionMessage("Workspace link copied.");
+                                }}
+                                className="rounded-[10px] bg-black px-3 py-2 text-xs font-bold text-white dark:bg-white dark:text-black"
+                            >Copy link</button>
                         </div>
                         <div className="mt-5 flex items-center justify-between rounded-[14px] border border-black/[0.06] px-4 py-3 dark:border-white/[0.08]">
                             <div>
@@ -466,25 +818,23 @@ export function NotebookWorkspace() {
                         <div className="flex items-start justify-between">
                             <div>
                                 <div className="text-lg font-extrabold tracking-[-0.025em]">Version history</div>
-                                <div className="mt-1 text-xs text-black/40 dark:text-white/38">Frontend demo snapshots</div>
+                                <div className="mt-1 text-xs text-black/40 dark:text-white/38">Local notebook snapshots</div>
                             </div>
                             <button onClick={() => setHistoryOpen(false)} className="notebook-icon-button"><X className="h-4 w-4" /></button>
                         </div>
                         <div className="mt-5 space-y-2">
-                            {[
-                                ["Current version", "Just now", "Auto-saved"],
-                                ["Graph refinement", "12 min ago", "5 blocks"],
-                                ["Initial notebook", "Today, 19:42", "3 blocks"],
-                            ].map(([title, time, detail], index) => (
-                                <button key={title} className="flex w-full items-center gap-3 rounded-[15px] border border-black/[0.06] px-4 py-3 text-left transition hover:bg-black/[0.025] dark:border-white/[0.08] dark:hover:bg-white/[0.04]">
+                            {historyItems.length ? historyItems.map((item, index) => (
+                                <button key={item.id} onClick={() => restoreHistoryItem(item)} className="flex w-full items-center gap-3 rounded-[15px] border border-black/[0.06] px-4 py-3 text-left transition hover:bg-black/[0.025] dark:border-white/[0.08] dark:hover:bg-white/[0.04]">
                                     <span className={`h-2 w-2 rounded-full ${index === 0 ? "bg-emerald-500" : "bg-black/15 dark:bg-white/20"}`} />
                                     <span className="flex-1">
-                                        <span className="block text-xs font-bold">{title}</span>
-                                        <span className="mt-1 block text-[11px] text-black/38 dark:text-white/35">{time} · {detail}</span>
+                                        <span className="block truncate text-xs font-bold">{item.pageTitle || item.documentTitle}</span>
+                                        <span className="mt-1 block text-[11px] text-black/38 dark:text-white/35">{new Date(item.createdAt).toLocaleString()} · {item.blocks.length} blocks</span>
                                     </span>
                                     {index === 0 ? <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> : null}
                                 </button>
-                            ))}
+                            )) : (
+                                <div className="rounded-[15px] border border-dashed border-black/[0.08] px-4 py-5 text-xs text-black/40 dark:border-white/[0.1] dark:text-white/38">Snapshots will appear after the first edit.</div>
+                            )}
                         </div>
                     </div>
                 </ModalBackdrop>
@@ -501,8 +851,8 @@ export function NotebookWorkspace() {
                             <button onClick={() => setExportOpen(false)} className="notebook-icon-button"><X className="h-4 w-4" /></button>
                         </div>
                         <div className="mt-5 grid grid-cols-2 gap-2">
-                            {["PDF", "Writer", "Markdown", "LaTeX", "Notebook JSON", "Image"].map((format) => (
-                                <button key={format} className="rounded-[14px] border border-black/[0.07] px-4 py-4 text-left text-xs font-bold transition hover:border-black/15 hover:bg-black/[0.025] dark:border-white/[0.09] dark:hover:border-white/15 dark:hover:bg-white/[0.04]">
+                            {["PDF", "Writer", "Markdown", "LaTeX", "Notebook JSON", "Jupyter .ipynb", "Image"].map((format) => (
+                                <button key={format} onClick={() => void handleExport(format)} className="rounded-[14px] border border-black/[0.07] px-4 py-4 text-left text-xs font-bold transition hover:border-black/15 hover:bg-black/[0.025] dark:border-white/[0.09] dark:hover:border-white/15 dark:hover:bg-white/[0.04]">
                                     <Download className="mb-3 h-4 w-4 text-black/32 dark:text-white/32" />
                                     {format}
                                 </button>

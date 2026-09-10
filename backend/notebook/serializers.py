@@ -50,6 +50,16 @@ def validate_block_payload(value):
         config = block.get("config", {})
         if config is not None and not isinstance(config, dict):
             raise serializers.ValidationError(f"Block {index + 1} config must be an object.")
+        reference = block.get("scientific_object_reference")
+        if reference is not None:
+            if not isinstance(reference, dict):
+                raise serializers.ValidationError(f"Block {index + 1} scientific_object_reference must be an object.")
+            if not isinstance(reference.get("projectId"), str) or not reference["projectId"].strip():
+                raise serializers.ValidationError(f"Block {index + 1} reference projectId is required.")
+            if not isinstance(reference.get("objectId"), str) or not reference["objectId"].strip():
+                raise serializers.ValidationError(f"Block {index + 1} reference objectId is required.")
+            if reference.get("mode") not in {"live", "pinned", "frozen"}:
+                raise serializers.ValidationError(f"Block {index + 1} reference mode is invalid.")
     return value
 
 
@@ -218,6 +228,19 @@ class NotebookExecuteSerializer(serializers.Serializer):
     title = serializers.CharField(max_length=180, required=False, allow_blank=True)
     content = serializers.CharField()
     config = serializers.DictField(required=False, child=serializers.CharField(allow_blank=True))
+    execution_target = serializers.ChoiceField(choices=["this-device", "local-python", "jupyter-kernel", "external-server", "hpc-cluster"], required=False)
+    scientific_object_reference = serializers.DictField(required=False)
+
+    def validate_scientific_object_reference(self, value):
+        if not value.get("projectId") or not isinstance(value.get("projectId"), str):
+            raise serializers.ValidationError("reference projectId is required.")
+        if not value.get("objectId") or not isinstance(value.get("objectId"), str):
+            raise serializers.ValidationError("reference objectId is required.")
+        if value.get("mode") not in {"live", "pinned", "frozen"}:
+            raise serializers.ValidationError("reference mode is invalid.")
+        if "revision" in value and (not isinstance(value["revision"], int) or value["revision"] < 1):
+            raise serializers.ValidationError("reference revision is invalid.")
+        return value
 
 
 class NotebookRestoreSnapshotSerializer(serializers.Serializer):

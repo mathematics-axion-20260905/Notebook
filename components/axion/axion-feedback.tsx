@@ -31,7 +31,7 @@ export function AxNotice({
     <div className={cx("flex items-start justify-between gap-4 rounded-[var(--ax-radius-control)] border px-3 py-2.5", tones[tone], className)}>
       <div className="min-w-0">
         {title ? <div className="text-[11px] font-semibold text-[var(--ax-text)]">{title}</div> : null}
-        <div className={cx("text-[11px] leading-5 text-[var(--ax-text-soft)]", title && "mt-1")}>{children}</div>
+        <div className={cx("text-[11px] leading-5 text-[var(--ax-text-soft)]", title ? "mt-1" : false)}>{children}</div>
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
     </div>

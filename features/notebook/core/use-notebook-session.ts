@@ -3,12 +3,14 @@
 import React from "react";
 
 import { executeLocalPreview, inferDependencyGraph, serializeBlockToMarkdown } from "@/features/notebook/core/runtime";
+import { createNotebookKernelAdapter, type JupyterServerAdapterOptions, type NotebookKernelAdapter, type PyodideAdapterOptions } from "@/features/notebook/core/jupyter-adapter";
 import type {
     NotebookBlock,
     NotebookCheckpoint,
     NotebookDocument,
     NotebookExecutionJob,
     NotebookExecutionRecord,
+    NotebookExecutionTarget,
 } from "@/features/notebook/core/types";
 import { fetchNotebookSession, type NotebookSessionUser, loginNotebookUser, logoutNotebookUser, refreshNotebookSession } from "@/lib/auth";
 import {
@@ -29,6 +31,9 @@ type UseNotebookSessionOptions = {
     initialBlocks: NotebookBlock[];
     initialTitle: string;
     initialSummary: string;
+    executionTarget?: NotebookExecutionTarget;
+    jupyter?: JupyterServerAdapterOptions;
+    pyodide?: PyodideAdapterOptions;
 };
 
 export function useNotebookSession(options: UseNotebookSessionOptions) {
@@ -53,6 +58,24 @@ export function useNotebookSession(options: UseNotebookSessionOptions) {
     const [authError, setAuthError] = React.useState<string | null>(null);
     const [isAuthLoading, setIsAuthLoading] = React.useState(true);
     const sessionId = React.useRef(crypto.randomUUID());
+    const kernelAdapterRef = React.useRef<NotebookKernelAdapter | null>(null);
+
+    React.useEffect(() => () => {
+        if (kernelAdapterRef.current?.dispose) void kernelAdapterRef.current.dispose();
+    }, []);
+
+    const getKernelAdapter = React.useCallback(() => {
+        const target = options.executionTarget;
+        if (!target || !["this-device", "jupyter-kernel"].includes(target)) return null;
+        if (!kernelAdapterRef.current || kernelAdapterRef.current.target !== target) {
+            if (kernelAdapterRef.current?.dispose) void kernelAdapterRef.current.dispose();
+            kernelAdapterRef.current = createNotebookKernelAdapter(target, {
+                jupyter: options.jupyter,
+                pyodide: options.pyodide,
+            });
+        }
+        return kernelAdapterRef.current;
+    }, [options.executionTarget, options.jupyter, options.pyodide]);
 
     const dependencyGraph = React.useMemo(() => inferDependencyGraph(blocks), [blocks]);
     const markdown = React.useMemo(() => blocks.map(serializeBlockToMarkdown).join("\n\n"), [blocks]);
@@ -224,7 +247,7 @@ export function useNotebookSession(options: UseNotebookSessionOptions) {
             return;
         }
 
-        const localPreview = block.kind === "graph" || block.kind === "table" || block.kind === "code"
+        const localPreview = block.kind === "graph" || block.kind === "table"
             ? executeLocalPreview(block)
             : null;
         setBlockPatch(blockId, {
@@ -240,23 +263,31 @@ export function useNotebookSession(options: UseNotebookSessionOptions) {
             },
         });
         try {
-            const submittedJob = block.kind === "solve" || block.kind === "graph" || block.kind === "table" || block.kind === "code"
+            const kernelAdapter = block.kind === "code" ? getKernelAdapter() : null;
+            const kernelExecution = kernelAdapter ? await kernelAdapter.execute(block.content) : null;
+            if (kernelExecution?.status === "error") {
+                const errorText = kernelExecution.output.errors?.[0]?.evalue || kernelExecution.output.text || "Kernel execution failed.";
+                throw new Error(errorText);
+            }
+            const submittedJob = !kernelExecution && (block.kind === "solve" || block.kind === "graph" || block.kind === "table" || block.kind === "code")
                 ? await executeNotebookBlock(targetDocumentId, block)
                 : null;
             const finalJob = submittedJob ? await waitForExecutionJob(submittedJob) : null;
             if (finalJob && finalJob.status !== "success") {
                 throw new Error(finalJob.detail || `Execution ${finalJob.status}.`);
             }
-            if (!localPreview && !finalJob) return;
+            if (!localPreview && !finalJob && !kernelExecution) return;
             setBlockPatch(blockId, {
                 execution: {
                     status: "success",
-                    runtime: (finalJob?.runtime ?? localPreview?.runtime ?? block.execution.runtime) as NotebookBlock["execution"]["runtime"],
+                    runtime: (kernelExecution?.runtime ?? finalJob?.runtime ?? localPreview?.runtime ?? block.execution.runtime) as NotebookBlock["execution"]["runtime"],
+                    target: kernelExecution?.target ?? block.execution.target,
+                    kernelId: kernelExecution?.kernelId ?? block.execution.kernelId,
                     cacheKey: finalJob?.cache_key ?? localPreview?.cache_key,
-                    detail: finalJob?.detail ?? localPreview?.detail,
-                    durationMs: finalJob?.duration_ms ?? localPreview?.duration_ms,
+                    detail: finalJob?.detail ?? localPreview?.detail ?? (kernelExecution ? "Executed in configured kernel." : undefined),
+                    durationMs: finalJob?.duration_ms ?? localPreview?.duration_ms ?? kernelExecution?.durationMs,
                     updatedAt: new Date().toISOString(),
-                    output: finalJob?.output ?? localPreview?.output,
+                    output: finalJob?.output ?? localPreview?.output ?? kernelExecution?.output,
                 },
             });
             if (targetDocumentId) {
@@ -274,7 +305,7 @@ export function useNotebookSession(options: UseNotebookSessionOptions) {
                 },
             });
         }
-    }, [blocks, documentId, saveDocument, sessionUser, setBlockPatch, waitForExecutionJob]);
+    }, [blocks, documentId, getKernelAdapter, saveDocument, sessionUser, setBlockPatch, waitForExecutionJob]);
 
     const runAll = React.useCallback(async (onlyStale = false) => {
         setRunAllState("running");
