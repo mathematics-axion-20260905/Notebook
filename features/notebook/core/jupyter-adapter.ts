@@ -1,6 +1,7 @@
 "use client";
 
 import type { NotebookExecutionTarget } from "@/features/notebook/core/types";
+import { createClientId } from "@/lib/client-id";
 
 export type NotebookKernelOutput = {
     text?: string;
@@ -156,7 +157,7 @@ export function createJupyterServerAdapter(options: JupyterServerAdapterOptions)
             socket = ws;
 
             return await new Promise<NotebookKernelExecution>((resolve) => {
-                const msgId = crypto.randomUUID();
+                const msgId = createClientId("jupyter-message");
                 const output: NotebookKernelOutput = { displayData: [], errors: [] };
                 let settled = false;
                 let timeout: number | undefined;
@@ -212,7 +213,7 @@ export function createJupyterServerAdapter(options: JupyterServerAdapterOptions)
                         header: {
                             msg_id: msgId,
                             username: "axion-notebook",
-                            session: crypto.randomUUID(),
+                            session: createClientId("jupyter-session"),
                             msg_type: "execute_request",
                             version: "5.3",
                         },

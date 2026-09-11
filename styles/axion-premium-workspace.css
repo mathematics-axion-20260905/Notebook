@@ -34,11 +34,11 @@
 .ax-work-input,.ax-work-select,.ax-work-button { min-height: 40px; border-radius: var(--ax-work-control-radius); }
 .ax-work-input,.ax-work-select { border: 1px solid var(--ax-work-line-strong); background: var(--ax-surface); color: var(--ax-text); }
 .ax-work-input:focus,.ax-work-select:focus { border-color: var(--ax-accent); outline: none; box-shadow: var(--ax-focus-ring); }
-.ax-work-subnav { border-bottom: 1px solid var(--ax-work-line); background: color-mix(in srgb, var(--ax-surface) 96%, transparent); backdrop-filter: blur(18px) saturate(125%); }
+.ax-work-subnav { border-bottom: 1px solid var(--ax-work-line); background: var(--ax-surface); }
 .ax-work-subnav-inner { width: 100%; max-width: var(--ax-work-max); min-height: 44px; margin-inline: auto; padding-inline: 24px; }
 
 #notebook,.site-workspace-shell { background: var(--ax-canvas) !important; }
-#notebook > header,.site-workspace-topbar,.site-shell > .border-b:first-child { min-height: var(--ax-work-header) !important; border-color: var(--ax-work-line) !important; background: color-mix(in srgb, var(--ax-surface) 95%, transparent) !important; box-shadow: none !important; backdrop-filter: blur(18px) saturate(125%); }
+#notebook > header,.site-workspace-topbar,.site-shell > .border-b:first-child { min-height: var(--ax-work-header) !important; border-color: var(--ax-work-line) !important; background: var(--ax-surface) !important; box-shadow: none !important; }
 #notebook > header > div,.site-workspace-topbar > div,.site-shell > .border-b:first-child > div { max-width: var(--ax-work-max) !important; }
 .ax-notebook-workspace #notebook > header > div { padding-inline: 24px !important; }
 .ax-notebook-workspace #notebook > div.relative { width: 100%; max-width: var(--ax-work-max) !important; }

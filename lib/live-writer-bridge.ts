@@ -1,3 +1,5 @@
+import { createClientId } from "@/lib/client-id";
+
 export type PlotPoint = {
     x: number;
     y: number;
@@ -167,11 +169,7 @@ export type LiveWriterBridgeMessage =
 const LAB_RESULT_BLOCK_REGEX = /```lab-result\n([\s\S]*?)\n```/g;
 
 function buildId() {
-    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-        return crypto.randomUUID();
-    }
-
-    return `lab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    return createClientId("lab");
 }
 
 export function createBroadcastChannel(name = LIVE_WRITER_BRIDGE_CHANNEL) {

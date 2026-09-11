@@ -6,11 +6,12 @@ import { LaboratoryInlineMathMarkdown } from "@/components/laboratory/laboratory
 import { PremiumFeatureBadge } from "@/components/premium-feature-badge";
 import { createIdleExecutionState } from "@/features/notebook/core/runtime";
 import type { NotebookBlock, NotebookBlockPlugin, NotebookPluginRenderProps } from "@/features/notebook/core/types";
+import { createClientId } from "@/lib/client-id";
 import { buildIntegralCodeForMode } from "@/lib/integral-code-generator";
 
 function createBlock(kind: NotebookBlock["kind"], family: NotebookBlock["family"], title: string, content: string, config: Record<string, string> = {}, runtime: "local" | "hybrid" | "server-boundary" = "local"): NotebookBlock {
     return {
-        id: `${kind}-${crypto.randomUUID()}`,
+        id: `${kind}-${createClientId()}`,
         kind,
         family,
         title,

@@ -13,6 +13,7 @@ import type {
     NotebookExecutionTarget,
 } from "@/features/notebook/core/types";
 import { fetchNotebookSession, type NotebookSessionUser, loginNotebookUser, logoutNotebookUser, refreshNotebookSession } from "@/lib/auth";
+import { createClientId } from "@/lib/client-id";
 import {
     createNotebookDocument,
     createNotebookSnapshot,
@@ -57,7 +58,7 @@ export function useNotebookSession(options: UseNotebookSessionOptions) {
     const [sessionUser, setSessionUser] = React.useState<NotebookSessionUser | null>(null);
     const [authError, setAuthError] = React.useState<string | null>(null);
     const [isAuthLoading, setIsAuthLoading] = React.useState(true);
-    const sessionId = React.useRef(crypto.randomUUID());
+    const sessionId = React.useRef(createClientId("session"));
     const kernelAdapterRef = React.useRef<NotebookKernelAdapter | null>(null);
 
     React.useEffect(() => () => {

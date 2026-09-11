@@ -49,6 +49,7 @@ import { createNotebookKernelAdapter, type NotebookKernelAdapter } from "@/featu
 import type { NotebookBlock as ApiNotebookBlock, NotebookExecutionTarget } from "@/features/notebook/core/types";
 import { getEcosystemObjectHref, getEcosystemTransferHref } from "@/lib/ecosystem/apps";
 import { resolveActiveProjectId } from "@/lib/ecosystem/project-context";
+import { createClientId } from "@/lib/client-id";
 import { createNotebookDocument, fetchNotebookDocuments, updateNotebookDocument, type NotebookDocumentPayload } from "@/lib/notebook";
 import { ensureNotebookGuestSession } from "@/lib/auth";
 
@@ -158,7 +159,7 @@ const graphData = Array.from({ length: 129 }, (_, index) => {
 });
 
 function createBlock(kind: BlockKind): NotebookBlock {
-    const id = `${kind}-${crypto.randomUUID()}`;
+    const id = `${kind}-${createClientId()}`;
     if (kind === "text") return { id, kind, content: "Start writing…" };
     if (kind === "formula") return { id, kind, content: String.raw`f(x) = \sin(x) + x^2` };
     if (kind === "code") return { id, kind, content: "x = linspace(0, 10, 200)\ny = sin(x)" };
@@ -422,7 +423,7 @@ export function NotebookWorkspace() {
                 if (current[0]?.signature === signature) return current;
                 return [
                     {
-                        id: crypto.randomUUID(),
+                        id: createClientId("history"),
                         documentTitle,
                         pageTitle,
                         blocks,
@@ -569,7 +570,7 @@ export function NotebookWorkspace() {
             const index = current.findIndex((block) => block.id === id);
             if (index < 0) return current;
             const source = current[index];
-            const copy = { ...source, id: `${source.kind}-${crypto.randomUUID()}` };
+            const copy = { ...source, id: `${source.kind}-${createClientId()}` };
             return [...current.slice(0, index + 1), copy, ...current.slice(index + 1)];
         });
         setMenuBlockId(null);
@@ -650,7 +651,7 @@ export function NotebookWorkspace() {
             }
 
             const resultBlock: NotebookBlock = {
-                id: `result-${crypto.randomUUID()}`,
+                id: `result-${createClientId()}`,
                 kind: "result",
                 title: `${codeBlock.title || "Python"} result`,
                 content: outputText,
@@ -1061,8 +1062,8 @@ function BlockRenderer({
                     />
                     <span className="hidden rounded-full bg-[#2f6df6]/[0.08] px-2.5 py-1 text-[10px] font-bold text-[#2f6df6] sm:inline">t = 0.5</span>
                 </div>
-                <div className="h-[260px] w-full sm:h-[320px]">
-                    <ResponsiveContainer width="100%" height="100%">
+                <div className="h-[260px] min-h-[260px] w-full sm:h-[320px] sm:min-h-[320px]">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={260} debounce={120}>
                         <LineChart data={graphData} margin={{ top: 8, right: 12, bottom: 10, left: -8 }}>
                             <CartesianGrid stroke="currentColor" strokeOpacity={0.07} vertical={false} />
                             <ReferenceLine y={0} stroke="currentColor" strokeOpacity={0.13} />
@@ -1094,7 +1095,7 @@ function BlockRenderer({
                                 labelFormatter={(value) => `x = ${Number(value).toFixed(3)}`}
                                 contentStyle={{ borderRadius: 12, border: "1px solid rgba(120,120,120,.16)", fontSize: 11 }}
                             />
-                            <Line type="monotone" dataKey="y" stroke="#2f6df6" strokeWidth={2.4} dot={false} activeDot={{ r: 4 }} />
+                            <Line type="monotone" dataKey="y" stroke="#2f6df6" strokeWidth={2.4} dot={false} activeDot={{ r: 4 }} isAnimationActive={false} animationDuration={0} />
                         </LineChart>
                     </ResponsiveContainer>
                 </div>
