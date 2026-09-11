@@ -1063,7 +1063,7 @@ function BlockRenderer({
                     <span className="hidden rounded-full bg-[#2f6df6]/[0.08] px-2.5 py-1 text-[10px] font-bold text-[#2f6df6] sm:inline">t = 0.5</span>
                 </div>
                 <div className="h-[260px] min-h-[260px] w-full sm:h-[320px] sm:min-h-[320px]">
-                    <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={260} debounce={120}>
+                    <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={260} initialDimension={{ width: 640, height: 260 }} debounce={120}>
                         <LineChart data={graphData} margin={{ top: 8, right: 12, bottom: 10, left: -8 }}>
                             <CartesianGrid stroke="currentColor" strokeOpacity={0.07} vertical={false} />
                             <ReferenceLine y={0} stroke="currentColor" strokeOpacity={0.13} />
