@@ -12,7 +12,7 @@
 
 .ax-landing-container { width: 100%; max-width: var(--ax-landing-max); margin-inline: auto; padding-inline: var(--ax-landing-pad); }
 .ax-premium-nav { position: sticky; top: 0; z-index: 50; border-bottom: 1px solid color-mix(in srgb, var(--ax-line) 82%, transparent); background: var(--ax-surface); }
-.ax-premium-nav-inner { display: flex; min-height: 72px; align-items: center; justify-content: space-between; gap: 24px; }
+.ax-premium-nav-inner { display: flex; min-height: 72px; align-items: center; justify-content: space-between; gap: 24px; padding-inline: var(--ax-landing-pad); }
 .ax-premium-nav-link { position: relative; display: inline-flex; min-height: 36px; align-items: center; padding-inline: 10px; font-size: 12px; font-weight: 650; color: var(--ax-text-soft); transition: color var(--ax-motion-standard) var(--ax-ease-standard); }
 .ax-premium-nav-link::after { position: absolute; right: 10px; bottom: 4px; left: 10px; height: 1px; content: ""; background: var(--ax-accent); opacity: 0; transform: scaleX(.55); transition: opacity var(--ax-motion-standard) var(--ax-ease-standard), transform var(--ax-motion-standard) var(--ax-ease-standard); }
 .ax-premium-nav-link:hover { color: var(--ax-text); }

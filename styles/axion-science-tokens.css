@@ -29,6 +29,9 @@
   --ax-ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
 
   --ax-content-max: 1520px;
+  --ax-landing-max: 1520px;
+  --ax-landing-pad: clamp(24px, 4vw, 80px);
+  --ax-landing-section: clamp(96px, 10vw, 152px);
   --ax-reading-max: 820px;
   --ax-instrument-panel: 360px;
 
