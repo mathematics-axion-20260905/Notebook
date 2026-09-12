@@ -11,6 +11,8 @@ type TokenResponse = {
     refresh: string;
 };
 
+let guestSessionPromise: Promise<NotebookSessionUser> | null = null;
+
 async function parseApiError(response: Response) {
     try {
         const data = await response.json();
@@ -61,12 +63,34 @@ export async function bootstrapDemoNotebookUser() {
 }
 
 export async function ensureNotebookGuestSession() {
-    const current = await fetchNotebookSession();
-    if (current) return current;
-    const bootstrap = await bootstrapDemoNotebookUser();
-    window.localStorage.setItem("notebook_access_token", bootstrap.access);
-    window.localStorage.setItem("notebook_refresh_token", bootstrap.refresh);
-    return await fetchNotebookSession();
+    if (guestSessionPromise) return guestSessionPromise;
+
+    guestSessionPromise = (async () => {
+        const current = await fetchNotebookSession();
+        if (current) return current;
+
+        // Access tokens are intentionally short-lived. Try the refresh token
+        // before issuing a new shared guest session, and serialize concurrent
+        // callers so an expired token cannot win a race against a fresh one.
+        const refreshedAccess = await refreshNotebookSession();
+        if (refreshedAccess) {
+            const refreshed = await fetchNotebookSession();
+            if (refreshed) return refreshed;
+        }
+
+        const bootstrap = await bootstrapDemoNotebookUser();
+        window.localStorage.setItem("notebook_access_token", bootstrap.access);
+        window.localStorage.setItem("notebook_refresh_token", bootstrap.refresh);
+        const bootstrapped = await fetchNotebookSession();
+        if (!bootstrapped) throw new Error("NOTEBOOK_SESSION_UNAVAILABLE");
+        return bootstrapped;
+    })();
+
+    try {
+        return await guestSessionPromise;
+    } finally {
+        guestSessionPromise = null;
+    }
 }
 
 export function logoutNotebookUser() {
