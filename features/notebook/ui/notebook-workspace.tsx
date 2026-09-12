@@ -54,7 +54,7 @@ import { createNotebookDocument, fetchNotebookDocuments, updateNotebookDocument,
 import { ensureNotebookGuestSession } from "@/lib/auth";
 
 type BlockKind = "text" | "formula" | "code" | "graph" | "table" | "result";
-type SaveState = "saved" | "saving";
+type SaveState = "saved" | "saving" | "error";
 type NotebookHistoryItem = {
     id: string;
     documentTitle: string;
@@ -276,7 +276,7 @@ export function NotebookWorkspace() {
             window.localStorage.setItem("axion-notebook-backend-document-id", saved.id);
             setSaveState("saved");
         } catch (error) {
-            setSaveState("saved");
+            setSaveState("error");
             setExecutionMessage(error instanceof Error ? `Local copy kept; server save failed: ${error.message}` : "Local copy kept; server save failed.");
         }
     }, []);
@@ -729,8 +729,8 @@ export function NotebookWorkspace() {
                             className="w-[190px] bg-transparent text-center text-sm font-semibold tracking-[-0.01em] outline-none"
                         />
                         <span className="flex items-center gap-1.5 text-[11px] font-semibold text-black/40 dark:text-white/40">
-                            {saveState === "saved" ? <Check className="h-3.5 w-3.5" /> : <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />}
-                            {saveState === "saved" ? "Saved" : "Saving"}
+                            {saveState === "saved" ? <Check className="h-3.5 w-3.5" /> : <span className={`h-1.5 w-1.5 ${saveState === "saving" ? "animate-pulse" : "bg-red-500"} rounded-full`} />}
+                            {saveState === "saved" ? "Saved" : saveState === "error" ? "Save failed" : "Saving"}
                         </span>
                     </div>
 
@@ -760,7 +760,7 @@ export function NotebookWorkspace() {
                             <Play className={`h-3.5 w-3.5 ${running ? "animate-pulse" : ""}`} />
                             <span className="hidden sm:inline">{running ? "Running" : "Run"}</span>
                         </button>
-                        {executionMessage ? <span className="hidden max-w-[240px] truncate text-[10px] font-semibold text-black/40 dark:text-white/40 xl:inline">{executionMessage}</span> : null}
+                        {executionMessage ? <span className={`${saveState === "error" ? "inline max-w-[220px] text-red-600 dark:text-red-300" : "hidden xl:inline max-w-[240px]"} truncate text-[10px] font-semibold text-black/40 dark:text-white/40`}>{executionMessage}</span> : null}
                         <button onClick={() => setShareOpen(true)} className="notebook-toolbar-button">
                             <Share2 className="h-3.5 w-3.5" />
                             <span className="hidden sm:inline">Share</span>
