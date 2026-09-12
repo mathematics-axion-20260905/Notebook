@@ -522,40 +522,49 @@ export function NotebookWorkspace() {
         }
         if (format === "Writer") {
             const projectId = resolveActiveProjectId();
-            if (!projectId) {
-                setExecutionMessage("Open this notebook from a Project before sending it to Writer.");
-                return;
-            }
+            const transferProjectId = projectId || "unassigned-transfer";
             try {
-                const object = await createLocalScientificObject({
-                    projectId,
-                    kind: "notebook",
-                    domain: "notebook",
-                    title: `${documentTitle} · ${pageTitle}`,
-                    sourceApp: "notebook",
-                    payload: {
-                        type: "notebook",
-                        schemaVersion: "1.0",
-                        documentTitle,
-                        pageTitle,
-                        blocks,
-                        report_markdown: markdown,
-                        summary: `Notebook with ${blocks.length} scientific blocks.`,
-                    },
-                    provenance: {
-                        sourceApp: "notebook",
-                        engine: "Axion Notebook",
-                        engineVersion: "workspace-v1",
-                        executionTarget,
-                        inputs: { blockCount: blocks.length },
-                        finishedAt: new Date().toISOString(),
-                    },
-                });
+                const sourceReference = [...blocks]
+                    .reverse()
+                    .find((block) => block.scientific_object_reference)?.scientific_object_reference;
+                const serialized = sourceReference
+                    ? await exportLocalScientificObject(sourceReference.objectId)
+                    : await (async () => {
+                        const object = await createLocalScientificObject({
+                            projectId: transferProjectId,
+                            kind: "notebook",
+                            domain: "notebook",
+                            title: `${documentTitle} · ${pageTitle}`,
+                            sourceApp: "notebook",
+                            payload: {
+                                type: "notebook",
+                                schemaVersion: "1.0",
+                                documentTitle,
+                                pageTitle,
+                                blocks,
+                                report_markdown: markdown,
+                                summary: `Notebook with ${blocks.length} scientific blocks.`,
+                            },
+                            provenance: {
+                                sourceApp: "notebook",
+                                engine: "Axion Notebook",
+                                engineVersion: "workspace-v1",
+                                executionTarget,
+                                inputs: { blockCount: blocks.length },
+                                finishedAt: new Date().toISOString(),
+                            },
+                        });
+                        return await exportLocalScientificObject(object.id);
+                    })();
                 try {
-                    const transfer = await publishScientificObjectTransfer(await exportLocalScientificObject(object.id));
+                    const transfer = await publishScientificObjectTransfer(await serialized);
                     window.location.href = getEcosystemTransferHref("writer", transfer.transferId, projectId);
-                } catch {
-                    window.location.href = getEcosystemObjectHref("writer", projectId, object.id);
+                } catch (error) {
+                    if (projectId && sourceReference) {
+                        window.location.href = getEcosystemObjectHref("writer", projectId, sourceReference.objectId);
+                        return;
+                    }
+                    throw error;
                 }
             } catch (error) {
                 setExecutionMessage(error instanceof Error ? error.message : "Writer handoff failed.");
