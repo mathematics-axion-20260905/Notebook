@@ -260,6 +260,7 @@ export function NotebookWorkspace() {
         try {
             await ensureNotebookGuestSession();
             const current = snapshot;
+            const projectId = resolveActiveProjectId();
             const payload: NotebookDocumentPayload = {
                 title: current.documentTitle,
                 summary: current.pageTitle,
@@ -269,6 +270,7 @@ export function NotebookWorkspace() {
                     schema_version: 1,
                     source: "notebook-workspace-v1",
                     execution_target: current.executionTarget,
+                    ...(projectId ? { project_id: projectId } : {}),
                 },
             };
             const saved = current.backendDocumentId
@@ -296,15 +298,16 @@ export function NotebookWorkspace() {
         let alive = true;
         const searchParams = new URLSearchParams(window.location.search);
         const isTransferHydration = searchParams.get("source") === "transfer" && Boolean(searchParams.get("transferId"));
+        const activeProjectId = resolveActiveProjectId();
+        const storedId = window.localStorage.getItem("axion-notebook-backend-document-id");
         void ensureNotebookGuestSession()
-            .then(() => fetchNotebookDocuments())
+            .then(() => fetchNotebookDocuments(activeProjectId, storedId))
             .then((documents) => {
                 if (alive) setDocuments(documents);
                 // A cross-app Scientific Object import owns the initial state for
                 // this navigation. Loading an older/default document afterwards
                 // would overwrite the imported block before autosave completes.
                 if (!alive || isTransferHydration || !documents.length) return;
-                const storedId = window.localStorage.getItem("axion-notebook-backend-document-id");
                 const document = documents.find((item: { id: string }) => item.id === storedId) || documents[0];
                 if (!document) return;
                 setBackendDocumentId(document.id);

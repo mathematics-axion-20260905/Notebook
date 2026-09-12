@@ -7,7 +7,7 @@ import numpy as np
 import sympy as sp
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.db import transaction
+from django.db import connection, transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
@@ -245,10 +245,24 @@ class NotebookDocumentViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = NotebookDocument.objects.select_related("owner")
         if self.request.user and self.request.user.is_authenticated:
-            return queryset.filter(
+            queryset = queryset.filter(
                 Q(owner=self.request.user) | Q(visibility=NotebookDocument.VISIBILITY_PUBLIC_READ)
             ).distinct()
-        return queryset.filter(visibility=NotebookDocument.VISIBILITY_PUBLIC_READ)
+        else:
+            queryset = queryset.filter(visibility=NotebookDocument.VISIBILITY_PUBLIC_READ)
+
+        # Project context is carried in document metadata until the shared
+        # auth/RBAC layer owns project membership. This keeps the guest
+        # workspace from showing unrelated project documents while preserving
+        # the explicitly selected document during the migration period.
+        project_id = self.request.query_params.get("project")
+        if project_id:
+            project_scope = Q(metadata__project_id=project_id)
+            selected_id = self.request.query_params.get("document")
+            if selected_id:
+                project_scope |= Q(public_id=selected_id)
+            queryset = queryset.filter(project_scope)
+        return queryset
 
     @transaction.atomic
     def perform_create(self, serializer):
@@ -398,4 +412,10 @@ class BootstrapDemoUserView(APIView):
 
 def healthz(request):
     """Small unauthenticated probe for the service manager and load balancer."""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+    except Exception:
+        return JsonResponse({"status": "unhealthy", "service": "notebook-backend"}, status=503)
     return JsonResponse({"status": "ok", "service": "notebook-backend"})

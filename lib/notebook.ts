@@ -128,8 +128,11 @@ async function parseApiError(response: Response) {
     }
 }
 
-export async function fetchNotebookDocuments(): Promise<NotebookDocument[]> {
-    const response = await fetchPublic("/api/notebook/documents/?ordering=-updated_at");
+export async function fetchNotebookDocuments(projectId?: string | null, selectedDocumentId?: string | null): Promise<NotebookDocument[]> {
+    const params = new URLSearchParams({ ordering: "-updated_at" });
+    if (projectId) params.set("project", projectId);
+    if (selectedDocumentId) params.set("document", selectedDocumentId);
+    const response = await fetchPublic(`/api/notebook/documents/?${params.toString()}`);
     if (!response.ok) throw new Error(await parseApiError(response));
     const data = await response.json();
     const items = Array.isArray(data) ? data : Array.isArray(data.results) ? data.results : [];

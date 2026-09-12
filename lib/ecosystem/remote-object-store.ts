@@ -5,6 +5,24 @@ export type RemoteScientificObjectRecord = ScientificObject & {
   contentHash?: string;
 };
 
+export type RemoteProjectFileRecord = {
+  id: string;
+  projectId: string;
+  originalName: string;
+  size: number;
+  contentType: string;
+  contentHash: string;
+  metadata: Record<string, unknown>;
+  downloadUrl: string;
+  createdAt: string;
+};
+
+export type RemoteProjectRecord = {
+  slug: string;
+  title: string;
+  description?: string;
+};
+
 function coreUrl(path: string) {
   const base = (process.env.NEXT_PUBLIC_ECOSYSTEM_CORE_URL || "").replace(/\/$/, "");
   return base ? `${base}${path}` : null;
@@ -47,4 +65,34 @@ export async function getRemoteScientificObject(objectId: string): Promise<Remot
   if (response.status === 404) return null;
   if (!response.ok) throw new Error(await parseError(response));
   return await response.json() as RemoteScientificObjectRecord;
+}
+
+export async function getRemoteProject(projectId: string): Promise<RemoteProjectRecord | null> {
+  const endpoint = coreUrl(`/projects/${encodeURIComponent(projectId)}/`);
+  if (!endpoint) return null;
+  const response = await fetch(endpoint, { cache: "no-store" });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(await parseError(response));
+  return await response.json() as RemoteProjectRecord;
+}
+
+export async function listRemoteProjectFiles(projectId: string): Promise<RemoteProjectFileRecord[]> {
+  const endpoint = coreUrl(`/ecosystem/files/?project=${encodeURIComponent(projectId)}`);
+  if (!endpoint) return [];
+  const response = await fetch(endpoint, { cache: "no-store" });
+  if (!response.ok) throw new Error(await parseError(response));
+  const payload = await response.json() as { results?: RemoteProjectFileRecord[] };
+  return Array.isArray(payload.results) ? payload.results : [];
+}
+
+export async function uploadRemoteProjectFile(projectId: string, file: File, metadata: Record<string, unknown> = {}) {
+  const endpoint = coreUrl("/ecosystem/files/");
+  if (!endpoint) throw new Error("ECOSYSTEM_CORE_NOT_CONFIGURED");
+  const form = new FormData();
+  form.set("projectId", projectId);
+  form.set("file", file);
+  form.set("metadata", JSON.stringify(metadata));
+  const response = await fetch(endpoint, { method: "POST", body: form });
+  if (!response.ok) throw new Error(await parseError(response));
+  return await response.json() as RemoteProjectFileRecord;
 }

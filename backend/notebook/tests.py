@@ -59,6 +59,37 @@ class NotebookPermissionTests(APITestCase):
         }, format="json")
         self.assertIn(create_response.status_code, {status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN})
 
+    def test_project_filter_returns_only_matching_documents(self):
+        self.client.force_authenticate(self.owner)
+        NotebookDocument.objects.create(
+            owner=self.owner,
+            title="Project A",
+            visibility=NotebookDocument.VISIBILITY_PRIVATE,
+            blocks=sample_blocks(),
+            metadata={"project_id": "project-a"},
+        )
+        NotebookDocument.objects.create(
+            owner=self.owner,
+            title="Project B",
+            visibility=NotebookDocument.VISIBILITY_PRIVATE,
+            blocks=sample_blocks(),
+            metadata={"project_id": "project-b"},
+        )
+
+        response = self.client.get("/api/notebook/documents/?project=project-a")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual({item["title"] for item in response.json()}, {"Project A"})
+
+    def test_project_filter_keeps_selected_legacy_document_available(self):
+        self.client.force_authenticate(self.owner)
+        response = self.client.get(
+            f"/api/notebook/documents/?project=project-a&document={self.private_doc.public_id}"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual({item["title"] for item in response.json()}, {"Private"})
+
 
 class NotebookMutationTests(APITestCase):
     def setUp(self):

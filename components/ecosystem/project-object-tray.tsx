@@ -6,7 +6,7 @@ import { AxActionLink, AxBadge, AxButton, AxPanel } from "@/components/axion";
 import { getEcosystemHref, getEcosystemObjectHref, getEcosystemTransferHref } from "@/lib/ecosystem/apps";
 import { exportLocalScientificObject, getLocalScientificObject, importLocalScientificObject, listLocalScientificObjects } from "@/lib/ecosystem/local-object-store";
 import { publishScientificObjectTransfer } from "@/lib/ecosystem/transfer";
-import { getRemoteScientificObject, listRemoteScientificObjects } from "@/lib/ecosystem/remote-object-store";
+import { getRemoteProject, getRemoteScientificObject, listRemoteProjectFiles, listRemoteScientificObjects, uploadRemoteProjectFile, type RemoteProjectFileRecord } from "@/lib/ecosystem/remote-object-store";
 import { getLocalProjectTitle, resolveActiveProjectId } from "@/lib/ecosystem/project-context";
 import type { ScientificObject } from "@/lib/ecosystem/contracts";
 
@@ -19,15 +19,23 @@ function resultText(object: ScientificObject) {
   return object.title;
 }
 
+function formatFileSize(size: number) {
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function ProjectObjectTray() {
   const [projectId, setProjectId] = React.useState<string | null>(null);
   const [projectTitle, setProjectTitle] = React.useState<string | null>(null);
   const [objects, setObjects] = React.useState<ScientificObject[]>([]);
+  const [files, setFiles] = React.useState<RemoteProjectFileRecord[]>([]);
   const [open, setOpen] = React.useState(false);
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
   const [transferState, setTransferState] = React.useState<string | null>(null);
   const [sendingObjectId, setSendingObjectId] = React.useState<string | null>(null);
   const importInputRef = React.useRef<HTMLInputElement>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const refresh = React.useCallback(async () => {
     const activeProjectId = resolveActiveProjectId();
@@ -35,8 +43,12 @@ export function ProjectObjectTray() {
     setProjectTitle(getLocalProjectTitle(activeProjectId));
     if (!activeProjectId) {
       setObjects([]);
+      setFiles([]);
       return;
     }
+    void getRemoteProject(activeProjectId).then((project) => {
+      if (project?.title) setProjectTitle(project.title);
+    }).catch(() => undefined);
     try {
       const localObjects = await listLocalScientificObjects(activeProjectId);
       const merged = new Map(localObjects.map((object) => [object.id, object]));
@@ -57,6 +69,11 @@ export function ProjectObjectTray() {
         }
       } catch {
         // The local cache remains usable while the core is offline.
+      }
+      try {
+        setFiles(await listRemoteProjectFiles(activeProjectId));
+      } catch {
+        setFiles([]);
       }
       setObjects([...merged.values()].sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || "")));
     } catch {
@@ -132,6 +149,29 @@ export function ProjectObjectTray() {
                   }}
                 />
                 <AxButton size="sm" variant="quiet" onClick={() => importInputRef.current?.click()}>Import JSON</AxButton>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={async (event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = "";
+                    if (!file || !projectId) return;
+                    if (file.size > 100 * 1024 * 1024) {
+                      setTransferState("File limit is 100 MB");
+                      return;
+                    }
+                    setTransferState("Uploading…");
+                    try {
+                      await uploadRemoteProjectFile(projectId, file, { uploadedFrom: "notebook" });
+                      setTransferState("File uploaded");
+                      await refresh();
+                    } catch (error) {
+                      setTransferState(error instanceof Error ? error.message : "File upload failed");
+                    }
+                  }}
+                />
+                <AxButton size="sm" variant="quiet" onClick={() => fileInputRef.current?.click()}>Upload file</AxButton>
                 {transferState ? <span className="text-[9px] font-semibold text-[var(--ax-accent)]">{transferState}</span> : null}
               </div>
             </div>
@@ -184,6 +224,25 @@ export function ProjectObjectTray() {
                 <AxActionLink href={getEcosystemHref("math", "notebook", projectId)} size="sm">Open Math</AxActionLink>
               </div>
             )}
+            </div>
+            <div className="mt-5 border-t border-[var(--ax-work-line)] pt-4">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--ax-text-faint)]">Project files</div>
+                  <div className="mt-1 text-[10px] text-[var(--ax-text-soft)]">Stored in the ecosystem core and available to the whole Project.</div>
+                </div>
+                <AxBadge>{files.length}</AxBadge>
+              </div>
+              {files.length ? (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {files.map((file) => (
+                    <a key={file.id} href={file.downloadUrl} download={file.originalName} className="flex min-w-0 items-center justify-between gap-3 rounded-[var(--ax-work-panel-radius)] border border-[var(--ax-work-line)] px-3 py-2.5 transition hover:bg-[var(--ax-work-surface-muted)]">
+                      <span className="min-w-0 truncate text-[11px] font-semibold text-[var(--ax-text)]">{file.originalName}</span>
+                      <span className="shrink-0 text-[9px] text-[var(--ax-text-faint)]">{formatFileSize(file.size)}</span>
+                    </a>
+                  ))}
+                </div>
+              ) : <p className="text-[10px] text-[var(--ax-text-faint)]">No project files yet.</p>}
             </div>
           </div>
         ) : null}

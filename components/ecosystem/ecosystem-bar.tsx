@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { ECOSYSTEM_APPS, ECOSYSTEM_NAME, getEcosystemHref, type EcosystemApp } from "@/lib/ecosystem/apps";
 import { getLocalProjectTitle, resolveActiveProjectId } from "@/lib/ecosystem/project-context";
+import { getRemoteProject } from "@/lib/ecosystem/remote-object-store";
 
 export function EcosystemBar({ currentApp, projectId, projectTitle }: { currentApp: EcosystemApp; projectId?: string | null; projectTitle?: string | null }) {
   const [activeProjectId, setActiveProjectId] = useState(projectId || null);
@@ -12,7 +13,15 @@ export function EcosystemBar({ currentApp, projectId, projectTitle }: { currentA
   useEffect(() => {
     const resolvedId = resolveActiveProjectId(projectId);
     setActiveProjectId(resolvedId);
-    setActiveProjectTitle(projectTitle || getLocalProjectTitle(resolvedId));
+    const localTitle = projectTitle || getLocalProjectTitle(resolvedId);
+    setActiveProjectTitle(localTitle);
+    let alive = true;
+    if (!projectTitle && resolvedId) {
+      void getRemoteProject(resolvedId).then((project) => {
+        if (alive && project?.title) setActiveProjectTitle(project.title);
+      }).catch(() => undefined);
+    }
+    return () => { alive = false; };
   }, [projectId, projectTitle]);
 
   return (
