@@ -12,6 +12,7 @@ redis_data/
 backend/__pycache__/
 backend/**/__pycache__/
 *.pyc
+*.tsbuildinfo
 .env
 .env.*
 !.env.example
