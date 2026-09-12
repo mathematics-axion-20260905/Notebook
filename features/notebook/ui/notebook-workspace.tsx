@@ -291,10 +291,15 @@ export function NotebookWorkspace() {
 
     React.useEffect(() => {
         let alive = true;
+        const searchParams = new URLSearchParams(window.location.search);
+        const isTransferHydration = searchParams.get("source") === "transfer" && Boolean(searchParams.get("transferId"));
         void ensureNotebookGuestSession()
             .then(() => fetchNotebookDocuments())
             .then((documents) => {
-                if (!alive || !documents.length) return;
+                // A cross-app Scientific Object import owns the initial state for
+                // this navigation. Loading an older/default document afterwards
+                // would overwrite the imported block before autosave completes.
+                if (!alive || isTransferHydration || !documents.length) return;
                 const storedId = window.localStorage.getItem("axion-notebook-backend-document-id");
                 const document = documents.find((item: { id: string }) => item.id === storedId) || documents[0];
                 if (!document) return;
