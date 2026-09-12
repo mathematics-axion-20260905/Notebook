@@ -22,6 +22,21 @@ async function parseApiError(response: Response) {
     }
 }
 
+async function withoutAccessToken<T>(request: () => Promise<T>) {
+    const existingAccess = window.localStorage.getItem("notebook_access_token");
+    window.localStorage.removeItem("notebook_access_token");
+    try {
+        return await request();
+    } finally {
+        // Keep a newly issued token, but restore the old one when an anonymous
+        // recovery request fails so the caller can decide the next fallback.
+        const currentAccess = window.localStorage.getItem("notebook_access_token");
+        if (!currentAccess && existingAccess) {
+            window.localStorage.setItem("notebook_access_token", existingAccess);
+        }
+    }
+}
+
 export async function loginNotebookUser(username: string, password: string) {
     const response = await fetchPublic("/api/token/", {
         method: "POST",
@@ -37,10 +52,10 @@ export async function loginNotebookUser(username: string, password: string) {
 export async function refreshNotebookSession() {
     const refresh = window.localStorage.getItem("notebook_refresh_token");
     if (!refresh) return null;
-    const response = await fetchPublic("/api/token/refresh/", {
+    const response = await withoutAccessToken(() => fetchPublic("/api/token/refresh/", {
         method: "POST",
         body: JSON.stringify({ refresh }),
-    });
+    }));
     if (!response.ok) return null;
     const data = await response.json() as { access: string };
     window.localStorage.setItem("notebook_access_token", data.access);
@@ -55,9 +70,9 @@ export async function fetchNotebookSession() {
 }
 
 export async function bootstrapDemoNotebookUser() {
-    const response = await fetchPublic("/api/notebook/auth/bootstrap-demo/", {
+    const response = await withoutAccessToken(() => fetchPublic("/api/notebook/auth/bootstrap-demo/", {
         method: "POST",
-    });
+    }));
     if (!response.ok) throw new Error(await parseApiError(response));
     return await response.json() as { status: string; username: string; access: string; refresh: string };
 }
