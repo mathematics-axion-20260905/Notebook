@@ -2,6 +2,7 @@ import logging
 import math
 import time
 from datetime import timedelta
+from uuid import UUID
 
 import numpy as np
 import sympy as sp
@@ -260,7 +261,12 @@ class NotebookDocumentViewSet(viewsets.ModelViewSet):
             project_scope = Q(metadata__project_id=project_id)
             selected_id = self.request.query_params.get("document")
             if selected_id:
-                project_scope |= Q(public_id=selected_id)
+                try:
+                    UUID(selected_id)
+                except ValueError:
+                    selected_id = None
+                if selected_id:
+                    project_scope |= Q(public_id=selected_id)
             queryset = queryset.filter(project_scope)
         return queryset
 
