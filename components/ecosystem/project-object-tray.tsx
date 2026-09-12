@@ -6,6 +6,7 @@ import { AxActionLink, AxBadge, AxButton, AxPanel } from "@/components/axion";
 import { getEcosystemHref, getEcosystemObjectHref, getEcosystemTransferHref } from "@/lib/ecosystem/apps";
 import { exportLocalScientificObject, getLocalScientificObject, importLocalScientificObject, listLocalScientificObjects } from "@/lib/ecosystem/local-object-store";
 import { publishScientificObjectTransfer } from "@/lib/ecosystem/transfer";
+import { getRemoteScientificObject, listRemoteScientificObjects } from "@/lib/ecosystem/remote-object-store";
 import { getLocalProjectTitle, resolveActiveProjectId } from "@/lib/ecosystem/project-context";
 import type { ScientificObject } from "@/lib/ecosystem/contracts";
 
@@ -37,7 +38,27 @@ export function ProjectObjectTray() {
       return;
     }
     try {
-      setObjects(await listLocalScientificObjects(activeProjectId));
+      const localObjects = await listLocalScientificObjects(activeProjectId);
+      const merged = new Map(localObjects.map((object) => [object.id, object]));
+      try {
+        const remoteObjects = await listRemoteScientificObjects(activeProjectId);
+        for (const remote of remoteObjects) {
+          if (!merged.has(remote.id)) {
+            try {
+              await importLocalScientificObject(remote.serializedPayload);
+              const hydrated = await listLocalScientificObjects(activeProjectId);
+              const cached = hydrated.find((object) => object.id === remote.id);
+              if (cached) merged.set(cached.id, cached);
+            } catch {
+              // Keep a remote summary visible even if IndexedDB is unavailable.
+              merged.set(remote.id, remote);
+            }
+          }
+        }
+      } catch {
+        // The local cache remains usable while the core is offline.
+      }
+      setObjects([...merged.values()].sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || "")));
     } catch {
       setObjects([]);
     }
@@ -59,7 +80,15 @@ export function ProjectObjectTray() {
     setSendingObjectId(objectId);
     setTransferState("Sending…");
     try {
-      const transfer = await publishScientificObjectTransfer(await exportLocalScientificObject(objectId));
+      let serialized: string;
+      try {
+        serialized = await exportLocalScientificObject(objectId);
+      } catch {
+        const remote = await getRemoteScientificObject(objectId);
+        if (!remote?.serializedPayload) throw new Error("SCIENTIFIC_OBJECT_NOT_FOUND");
+        serialized = remote.serializedPayload;
+      }
+      const transfer = await publishScientificObjectTransfer(serialized);
       window.location.assign(getEcosystemTransferHref("writer", transfer.transferId, projectId));
     } catch (error) {
       setTransferState(error instanceof Error ? error.message : "Transfer failed");

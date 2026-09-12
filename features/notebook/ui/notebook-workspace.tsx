@@ -46,7 +46,7 @@ import type { ScientificObjectReference } from "@/lib/ecosystem/contracts";
 import { discardScientificObjectTransfer, fetchScientificObjectTransfer } from "@/lib/ecosystem/transfer";
 import { publishScientificObjectTransfer } from "@/lib/ecosystem/transfer";
 import { createNotebookKernelAdapter, type NotebookKernelAdapter } from "@/features/notebook/core/jupyter-adapter";
-import type { NotebookBlock as ApiNotebookBlock, NotebookExecutionTarget } from "@/features/notebook/core/types";
+import type { NotebookBlock as ApiNotebookBlock, NotebookDocument, NotebookExecutionTarget } from "@/features/notebook/core/types";
 import { getEcosystemObjectHref, getEcosystemTransferHref } from "@/lib/ecosystem/apps";
 import { resolveActiveProjectId } from "@/lib/ecosystem/project-context";
 import { createClientId } from "@/lib/client-id";
@@ -245,6 +245,8 @@ export function NotebookWorkspace() {
     const [historyItems, setHistoryItems] = React.useState<NotebookHistoryItem[]>([]);
     const [exportOpen, setExportOpen] = React.useState(false);
     const [moreOpen, setMoreOpen] = React.useState(false);
+    const [documentsOpen, setDocumentsOpen] = React.useState(false);
+    const [documents, setDocuments] = React.useState<NotebookDocument[]>([]);
     const [outlineOpen, setOutlineOpen] = React.useState(false);
     const [menuBlockId, setMenuBlockId] = React.useState<string | null>(null);
     const [draggingId, setDraggingId] = React.useState<string | null>(null);
@@ -254,10 +256,10 @@ export function NotebookWorkspace() {
     const notebookStateRef = React.useRef({ blocks, documentTitle, pageTitle, executionTarget, backendDocumentId });
     notebookStateRef.current = { blocks, documentTitle, pageTitle, executionTarget, backendDocumentId };
 
-    const persistNotebook = React.useCallback(async () => {
+    const persistNotebook = React.useCallback(async (snapshot = notebookStateRef.current) => {
         try {
             await ensureNotebookGuestSession();
-            const current = notebookStateRef.current;
+            const current = snapshot;
             const payload: NotebookDocumentPayload = {
                 title: current.documentTitle,
                 summary: current.pageTitle,
@@ -274,6 +276,7 @@ export function NotebookWorkspace() {
                 : await createNotebookDocument(payload);
             setBackendDocumentId(saved.id);
             window.localStorage.setItem("axion-notebook-backend-document-id", saved.id);
+            setDocuments((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
             setSaveState("saved");
         } catch (error) {
             setSaveState("error");
@@ -296,6 +299,7 @@ export function NotebookWorkspace() {
         void ensureNotebookGuestSession()
             .then(() => fetchNotebookDocuments())
             .then((documents) => {
+                if (alive) setDocuments(documents);
                 // A cross-app Scientific Object import owns the initial state for
                 // this navigation. Loading an older/default document afterwards
                 // would overwrite the imported block before autosave completes.
@@ -314,6 +318,35 @@ export function NotebookWorkspace() {
             alive = false;
         };
     }, []);
+
+    const selectDocument = React.useCallback((document: NotebookDocument) => {
+        if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
+        if (saveState === "saving") void persistNotebook(notebookStateRef.current);
+        setBackendDocumentId(document.id);
+        setDocumentTitle(document.title);
+        setPageTitle(document.summary || "Research Notebook");
+        setBlocks(document.blocks.map(fromApiNotebookBlock));
+        window.localStorage.setItem("axion-notebook-backend-document-id", document.id);
+        setDocumentsOpen(false);
+        setMoreOpen(false);
+        setSaveState("saved");
+        setExecutionMessage(`Opened ${document.title}.`);
+    }, [persistNotebook, saveState]);
+
+    const startNewNotebook = React.useCallback(() => {
+        if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
+        if (saveState === "saving") void persistNotebook(notebookStateRef.current);
+        setBackendDocumentId(null);
+        window.localStorage.removeItem("axion-notebook-backend-document-id");
+        setDocumentTitle("Research Notebook");
+        setPageTitle("Untitled study");
+        setBlocks([]);
+        setActiveBlockId(null);
+        setSaveState("saving");
+        setDocumentsOpen(false);
+        setMoreOpen(false);
+        setExecutionMessage("New notebook ready. Add a block to save it.");
+    }, [persistNotebook, saveState]);
 
     React.useEffect(() => {
         const searchParams = new URLSearchParams(window.location.search);
@@ -393,6 +426,7 @@ export function NotebookWorkspace() {
                 setCommandOpen(false);
                 setShareOpen(false);
                 setHistoryOpen(false);
+                setDocumentsOpen(false);
                 setExportOpen(false);
                 setInsertIndex(null);
                 setMoreOpen(false);
@@ -771,6 +805,9 @@ export function NotebookWorkspace() {
                             </button>
                             {moreOpen ? (
                                 <div className="notebook-popover absolute right-0 top-11 w-56 p-1.5">
+                                    <MenuButton icon={FileText} label="Documents" onClick={() => { setDocumentsOpen(true); setMoreOpen(false); }} />
+                                    <MenuButton icon={Plus} label="New notebook" onClick={startNewNotebook} />
+                                    <div className="my-1 h-px bg-black/[0.06] dark:bg-white/[0.08]" />
                                     <MenuButton icon={Clock3} label="History" onClick={() => { setHistoryOpen(true); setMoreOpen(false); }} />
                                     <MenuButton icon={Download} label="Export" onClick={() => { setExportOpen(true); setMoreOpen(false); }} />
                                     <MenuButton icon={Search} label="Command palette" shortcut="⌘K" onClick={() => { setCommandOpen(true); setMoreOpen(false); }} />
@@ -984,6 +1021,34 @@ export function NotebookWorkspace() {
                                 </button>
                             )) : (
                                 <div className="rounded-[15px] border border-dashed border-black/[0.08] px-4 py-5 text-xs text-black/40 dark:border-white/[0.1] dark:text-white/38">Snapshots will appear after the first edit.</div>
+                            )}
+                        </div>
+                    </div>
+                </ModalBackdrop>
+            ) : null}
+
+            {documentsOpen ? (
+                <ModalBackdrop onClose={() => setDocumentsOpen(false)}>
+                    <div className="notebook-modal w-full max-w-lg p-6">
+                        <div className="flex items-start justify-between gap-6">
+                            <div>
+                                <div className="text-lg font-extrabold tracking-[-0.025em]">Documents</div>
+                                <div className="mt-1 text-xs text-black/40 dark:text-white/38">Saved notebooks in this workspace</div>
+                            </div>
+                            <button onClick={() => setDocumentsOpen(false)} className="notebook-icon-button"><X className="h-4 w-4" /></button>
+                        </div>
+                        <div className="mt-5 space-y-2">
+                            {documents.length ? documents.map((document) => (
+                                <button key={document.id} onClick={() => selectDocument(document)} className={`flex w-full items-center gap-3 rounded-[15px] border px-4 py-3 text-left transition hover:bg-black/[0.025] dark:hover:bg-white/[0.04] ${document.id === backendDocumentId ? "border-black/20 dark:border-white/20" : "border-black/[0.06] dark:border-white/[0.08]"}`}>
+                                    <FileText className="h-4 w-4 shrink-0 text-black/35 dark:text-white/35" />
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block truncate text-xs font-bold">{document.title}</span>
+                                        <span className="mt-1 block truncate text-[11px] text-black/38 dark:text-white/35">{document.summary || "No summary"} · {document.blocks.length} blocks</span>
+                                    </span>
+                                    {document.id === backendDocumentId ? <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> : null}
+                                </button>
+                            )) : (
+                                <div className="rounded-[15px] border border-dashed border-black/[0.08] px-4 py-5 text-xs text-black/40 dark:border-white/[0.1] dark:text-white/38">No saved notebooks yet. Add a block and it will appear here.</div>
                             )}
                         </div>
                     </div>
