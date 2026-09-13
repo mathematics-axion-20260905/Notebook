@@ -1,5 +1,6 @@
 export const SCIENTIFIC_OBJECT_SCHEMA_VERSION = "1.0" as const;
 export const SCIENTIFIC_OBJECT_TRANSFER_SCHEMA_VERSION = "1.0" as const;
+const MAX_SCIENTIFIC_OBJECT_REVISIONS = 1000;
 
 export type EcosystemAppId =
   | "science"
@@ -116,9 +117,12 @@ export function deserializeScientificObject<TPayload>(serialized: string): Scien
   let parsed: Partial<ScientificObjectTransferEnvelope<TPayload>>;
   try { parsed = JSON.parse(serialized) as Partial<ScientificObjectTransferEnvelope<TPayload>>; } catch { throw new Error("INVALID_SCIENTIFIC_OBJECT_TRANSFER_ENVELOPE"); }
   if (parsed.transferSchemaVersion !== SCIENTIFIC_OBJECT_TRANSFER_SCHEMA_VERSION || !parsed.object || !Array.isArray(parsed.revisions)) throw new Error("INVALID_SCIENTIFIC_OBJECT_TRANSFER_ENVELOPE");
-  if (!parsed.object.id || !parsed.object.projectId || !parsed.object.schemaVersion || !parsed.object.kind || !parsed.object.sourceApp || parsed.object.currentRevision < 1) throw new Error("INVALID_SCIENTIFIC_OBJECT_TRANSFER_OBJECT");
-  const revisionNumbers = parsed.revisions.map((revision) => revision.revision);
-  if (!parsed.revisions.length || new Set(revisionNumbers).size !== revisionNumbers.length || !parsed.revisions.some((revision) => revision.revision === parsed.object?.currentRevision) || parsed.revisions.some((revision) => revision.objectId !== parsed.object?.id || revision.revision < 1 || !revision.provenance)) throw new Error("INVALID_SCIENTIFIC_OBJECT_TRANSFER_REVISIONS");
+  const object = parsed.object;
+  const revisions = parsed.revisions;
+  if (typeof object.id !== "string" || typeof object.projectId !== "string" || typeof object.schemaVersion !== "string" || typeof object.kind !== "string" || typeof object.sourceApp !== "string" || !Number.isSafeInteger(object.currentRevision) || object.currentRevision < 1 || object.currentRevision > MAX_SCIENTIFIC_OBJECT_REVISIONS) throw new Error("INVALID_SCIENTIFIC_OBJECT_TRANSFER_OBJECT");
+  const revisionNumbers = revisions.map((revision) => revision.revision);
+  const hasCompleteHistory = revisions.length === object.currentRevision && revisionNumbers.every((revision) => Number.isSafeInteger(revision) && revision >= 1 && revision <= object.currentRevision);
+  if (!revisions.length || new Set(revisionNumbers).size !== revisionNumbers.length || !hasCompleteHistory || revisions.some((revision) => revision.objectId !== object.id || typeof revision.provenance !== "object" || revision.provenance === null || !("payload" in revision))) throw new Error("INVALID_SCIENTIFIC_OBJECT_TRANSFER_REVISIONS");
   return parsed as ScientificObjectTransferEnvelope<TPayload>;
 }
 

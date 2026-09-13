@@ -10,6 +10,8 @@
   color: var(--ax-text);
 }
 
+.ax-landing-section { content-visibility: auto; contain-intrinsic-size: auto 760px; }
+.ax-final-cta { content-visibility: auto; contain-intrinsic-size: auto 420px; }
 .ax-landing-container { width: 100%; max-width: var(--ax-landing-max); margin-inline: auto; padding-inline: var(--ax-landing-pad); }
 .ax-premium-nav { position: sticky; top: 0; z-index: 50; border-bottom: 1px solid color-mix(in srgb, var(--ax-line) 82%, transparent); background: var(--ax-surface); }
 .ax-premium-nav-inner { display: flex; min-height: 72px; align-items: center; justify-content: space-between; gap: 24px; padding-inline: var(--ax-landing-pad); }
