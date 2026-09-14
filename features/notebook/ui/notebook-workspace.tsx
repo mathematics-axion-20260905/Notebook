@@ -29,6 +29,7 @@ import {
     X,
 } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useLocale } from "@/components/locale-provider";
 import {
     CartesianGrid,
     Line,
@@ -224,6 +225,13 @@ function downloadNotebookFile(filename: string, content: string, mediaType = "te
 
 export function NotebookWorkspace() {
     const { theme, setTheme } = useTheme();
+    const { locale } = useLocale();
+    const copy = locale === "uz"
+        ? { back: "Ortga", saved: "Saqlandi", saveFailed: "Saqlash amalga oshmadi", saving: "Saqlanmoqda", kernel: "Yadro", target: "Hisoblash muhiti", thisDevice: "Ushbu qurilma", jupyter: "Jupyter yadrosi", setupNeeded: "sozlash kerak", external: "Tashqi server · keyinroq", hpc: "HPC klasteri · keyinroq", running: "Bajarilmoqda", run: "Bajarish", share: "Ulashish", more: "Qo‘shimcha amallar", documents: "Hujjatlar", newNotebook: "Yangi notebook", history: "Versiyalar tarixi", export: "Eksport", commands: "Buyruqlar paneli", light: "Yorug‘ ko‘rinish", dark: "To‘q ko‘rinish", outline: "Tuzilma", blockCount: "blok", openOutline: "Tuzilmani ochish", edited: "Hozirgina tahrirlandi", computational: "Hisoblash hujjati", untitled: "Nomsiz", drag: "Blokni ko‘chirish", runBlock: "Blokni bajarish", blockActions: "Blok amallari", duplicate: "Nusxalash", moveUp: "Yuqoriga ko‘chirish", moveDown: "Pastga ko‘chirish", delete: "O‘chirish", addFirst: "Birinchi blokni qo‘shing", search: "Bloklar va amallarni izlash…", addBlock: "Blok qo‘shish", allCommands: "Barcha buyruqlar uchun ⌘K", shareTitle: "Notebookni ulashish", shareDescription: "Hamkorlarni taklif qiling yoki ommaviy demo havolasini nusxalang.", currentWorkspace: "Joriy ish maydoni", copied: "Ish maydoni havolasi nusxalandi.", anyone: "Havolaga ega barcha foydalanuvchilar", canView: "Ushbu notebookni ko‘rishi mumkin", viewOnly: "Faqat ko‘rish", versionHistory: "Versiyalar tarixi", localSnapshots: "Mahalliy notebook nusxalari", snapshotEmpty: "Birinchi tahrirdan so‘ng nusxalar shu yerda ko‘rinadi.", savedNotebooks: "Saqlangan notebooklar", savedNotebooksDetail: "Ushbu ish maydonidagi notebooklar", noSaved: "Hozircha saqlangan notebooklar yo‘q. Blok qo‘shsangiz, u shu yerda ko‘rinadi.", exportDetail: "Notebookni toza saqlang; formatni faqat kerak bo‘lganda tanlang.", insertBlock: "Blok kiritish" }
+        : { back: "Go back", saved: "Saved", saveFailed: "Save failed", saving: "Saving", kernel: "Kernel", target: "Execution target", thisDevice: "This device", jupyter: "Jupyter kernel", setupNeeded: "setup needed", external: "External server · next", hpc: "HPC cluster · next", running: "Running", run: "Run", share: "Share", more: "More actions", documents: "Documents", newNotebook: "New notebook", history: "History", export: "Export", commands: "Command palette", light: "Light appearance", dark: "Dark appearance", outline: "Outline", blockCount: "blocks", openOutline: "Open outline", edited: "Edited just now", computational: "Computational document", untitled: "Untitled", drag: "Drag block", runBlock: "Run block", blockActions: "Block actions", duplicate: "Duplicate", moveUp: "Move up", moveDown: "Move down", delete: "Delete", addFirst: "Add your first block", search: "Search blocks and actions…", addBlock: "Add block", allCommands: "⌘K for all commands", shareTitle: "Share notebook", shareDescription: "Invite collaborators or copy a public demo link.", currentWorkspace: "Current workspace", copied: "Workspace link copied.", anyone: "Anyone with the link", canView: "Can view this notebook", viewOnly: "View only", versionHistory: "Version history", localSnapshots: "Local notebook snapshots", snapshotEmpty: "Snapshots will appear after the first edit.", savedNotebooks: "Documents", savedNotebooksDetail: "Saved notebooks in this workspace", noSaved: "No saved notebooks yet. Add a block and it will appear here.", exportDetail: "Keep the notebook clean; choose a format only when needed.", insertBlock: "Insert block" };
+    const localizedBlockCatalog = locale === "uz"
+        ? blockCatalog.map((item) => ({ ...item, label: ({ text: "Matn", formula: "Formula", code: "Kod", graph: "Grafik", table: "Jadval", result: "Natija" } as Record<BlockKind, string>)[item.kind], description: ({ text: "Qayd, sarlavha va izoh", formula: "Satrli matematik yozuv", code: "Python va hisoblash kodi", graph: "Interaktiv vizual natija", table: "Tuzilmali sonli natijalar", result: "Tushuncha yoki hisoblash xulosasi" } as Record<BlockKind, string>)[item.kind] }))
+        : blockCatalog;
     const [blocks, setBlocks] = React.useState<NotebookBlock[]>(starterBlocks);
     const [documentTitle, setDocumentTitle] = React.useState("Research Notebook");
     const [pageTitle, setPageTitle] = React.useState("Heat Equation");
@@ -736,7 +744,7 @@ export function NotebookWorkspace() {
         touch();
     };
 
-    const filteredCatalog = blockCatalog.filter((item) => {
+    const filteredCatalog = localizedBlockCatalog.filter((item) => {
         const query = commandSearch.trim().toLowerCase();
         if (!query) return true;
         return `${item.label} ${item.description}`.toLowerCase().includes(query);
@@ -747,7 +755,7 @@ export function NotebookWorkspace() {
             <header className="sticky top-0 z-50 border-b border-black/[0.06] bg-[#f7f7f5]/90 backdrop-blur-2xl dark:border-white/[0.08] dark:bg-[#0b0b0b]/88">
                 <div className="mx-auto flex h-[62px] max-w-[1680px] items-center gap-3 px-4 sm:px-6">
                     <div className="flex min-w-0 flex-1 items-center gap-2">
-                        <button className="notebook-icon-button" aria-label="Go back">
+                        <button className="notebook-icon-button" aria-label={copy.back}>
                             <ArrowLeft className="h-[18px] w-[18px]" />
                         </button>
                         <div className="flex items-center gap-2.5">
@@ -767,15 +775,15 @@ export function NotebookWorkspace() {
                         />
                         <span className="flex items-center gap-1.5 text-[11px] font-semibold text-black/40 dark:text-white/40">
                             {saveState === "saved" ? <Check className="h-3.5 w-3.5" /> : <span className={`h-1.5 w-1.5 ${saveState === "saving" ? "animate-pulse" : "bg-red-500"} rounded-full`} />}
-                            {saveState === "saved" ? "Saved" : saveState === "error" ? "Save failed" : "Saving"}
+                            {saveState === "saved" ? copy.saved : saveState === "error" ? copy.saveFailed : copy.saving}
                         </span>
                     </div>
 
                     <div className="flex flex-1 items-center justify-end gap-1.5">
                         <label className="hidden items-center gap-1.5 rounded-[11px] border border-black/[0.07] bg-black/[0.025] px-2.5 py-2 text-[10px] font-semibold text-black/48 dark:border-white/[0.09] dark:bg-white/[0.04] dark:text-white/45 sm:flex">
-                            <span className="hidden lg:inline">Kernel</span>
+                            <span className="hidden lg:inline">{copy.kernel}</span>
                             <select
-                                aria-label="Execution target"
+                                aria-label={copy.target}
                                 value={executionTarget}
                                 disabled={running}
                                 onChange={(event) => {
@@ -787,37 +795,37 @@ export function NotebookWorkspace() {
                                 }}
                                 className="max-w-[112px] cursor-pointer bg-transparent text-[10px] font-bold text-black/70 outline-none dark:text-white/70"
                             >
-                                <option value="this-device">This device</option>
-                                <option value="jupyter-kernel" disabled={!jupyterConfigured}>Jupyter kernel{jupyterConfigured ? "" : " · setup needed"}</option>
-                                <option value="external-server" disabled>External server · next</option>
-                                <option value="hpc-cluster" disabled>HPC cluster · next</option>
+                                <option value="this-device">{copy.thisDevice}</option>
+                                <option value="jupyter-kernel" disabled={!jupyterConfigured}>{copy.jupyter}{jupyterConfigured ? "" : ` · ${copy.setupNeeded}`}</option>
+                                <option value="external-server" disabled>{copy.external}</option>
+                                <option value="hpc-cluster" disabled>{copy.hpc}</option>
                             </select>
                         </label>
                         <button onClick={runNotebook} className="notebook-toolbar-button">
                             <Play className={`h-3.5 w-3.5 ${running ? "animate-pulse" : ""}`} />
-                            <span className="hidden sm:inline">{running ? "Running" : "Run"}</span>
+                            <span className="hidden sm:inline">{running ? copy.running : copy.run}</span>
                         </button>
                         {executionMessage ? <span className={`${saveState === "error" ? "inline max-w-[220px] text-red-600 dark:text-red-300" : "hidden xl:inline max-w-[240px]"} truncate text-[10px] font-semibold text-black/40 dark:text-white/40`}>{executionMessage}</span> : null}
                         <button onClick={() => setShareOpen(true)} className="notebook-toolbar-button">
                             <Share2 className="h-3.5 w-3.5" />
-                            <span className="hidden sm:inline">Share</span>
+                            <span className="hidden sm:inline">{copy.share}</span>
                         </button>
                         <div className="relative">
-                            <button onClick={() => setMoreOpen((value) => !value)} className="notebook-icon-button" aria-label="More actions">
+                            <button onClick={() => setMoreOpen((value) => !value)} className="notebook-icon-button" aria-label={copy.more}>
                                 <MoreHorizontal className="h-[18px] w-[18px]" />
                             </button>
                             {moreOpen ? (
                                 <div className="notebook-popover absolute right-0 top-11 w-56 p-1.5">
-                                    <MenuButton icon={FileText} label="Documents" onClick={() => { setDocumentsOpen(true); setMoreOpen(false); }} />
-                                    <MenuButton icon={Plus} label="New notebook" onClick={startNewNotebook} />
+                                    <MenuButton icon={FileText} label={copy.documents} onClick={() => { setDocumentsOpen(true); setMoreOpen(false); }} />
+                                    <MenuButton icon={Plus} label={copy.newNotebook} onClick={startNewNotebook} />
                                     <div className="my-1 h-px bg-black/[0.06] dark:bg-white/[0.08]" />
-                                    <MenuButton icon={Clock3} label="History" onClick={() => { setHistoryOpen(true); setMoreOpen(false); }} />
-                                    <MenuButton icon={Download} label="Export" onClick={() => { setExportOpen(true); setMoreOpen(false); }} />
-                                    <MenuButton icon={Search} label="Command palette" shortcut="⌘K" onClick={() => { setCommandOpen(true); setMoreOpen(false); }} />
+                                    <MenuButton icon={Clock3} label={copy.history} onClick={() => { setHistoryOpen(true); setMoreOpen(false); }} />
+                                    <MenuButton icon={Download} label={copy.export} onClick={() => { setExportOpen(true); setMoreOpen(false); }} />
+                                    <MenuButton icon={Search} label={copy.commands} shortcut="⌘K" onClick={() => { setCommandOpen(true); setMoreOpen(false); }} />
                                     <div className="my-1 h-px bg-black/[0.06] dark:bg-white/[0.08]" />
                                     <MenuButton
                                         icon={theme === "dark" ? Sun : Moon}
-                                        label={theme === "dark" ? "Light appearance" : "Dark appearance"}
+                                        label={theme === "dark" ? copy.light : copy.dark}
                                         onClick={() => { setTheme(theme === "dark" ? "light" : "dark"); setMoreOpen(false); }}
                                     />
                                 </div>
@@ -833,8 +841,8 @@ export function NotebookWorkspace() {
                         <div className="notebook-popover w-64 p-3">
                             <div className="mb-3 flex items-center justify-between gap-3 px-1">
                                 <div>
-                                    <div className="text-xs font-extrabold">Outline</div>
-                                    <div className="mt-0.5 text-[11px] text-black/40 dark:text-white/40">{blocks.length} blocks</div>
+                                    <div className="text-xs font-extrabold">{copy.outline}</div>
+                                    <div className="mt-0.5 text-[11px] text-black/40 dark:text-white/40">{blocks.length} {copy.blockCount}</div>
                                 </div>
                                 <button onClick={() => setOutlineOpen(false)} className="notebook-icon-button h-8 w-8">
                                     <PanelLeftClose className="h-4 w-4" />
@@ -854,13 +862,13 @@ export function NotebookWorkspace() {
                                         className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[11px] text-black/55 hover:bg-black/[0.04] hover:text-black dark:text-white/50 dark:hover:bg-white/[0.06] dark:hover:text-white"
                                     >
                                         <BlockGlyph kind={block.kind} />
-                                        <span className="truncate">{block.title || blockCatalog.find((item) => item.kind === block.kind)?.label}</span>
+                                        <span className="truncate">{block.title || localizedBlockCatalog.find((item) => item.kind === block.kind)?.label}</span>
                                     </button>
                                 ))}
                             </div>
                         </div>
                     ) : (
-                        <button onClick={() => setOutlineOpen(true)} className="notebook-floating-button" aria-label="Open outline">
+                            <button onClick={() => setOutlineOpen(true)} className="notebook-floating-button" aria-label={copy.openOutline}>
                             <PanelLeftOpen className="h-4 w-4" />
                         </button>
                     )}
@@ -876,13 +884,13 @@ export function NotebookWorkspace() {
                                     touch();
                                 }}
                                 className="w-full bg-transparent font-serif text-[38px] font-semibold leading-tight tracking-[-0.035em] outline-none placeholder:text-black/20 dark:placeholder:text-white/20 sm:text-[48px]"
-                                placeholder="Untitled"
+                                placeholder={copy.untitled}
                             />
-                            <div className="mt-3 text-[12px] font-medium text-black/32 dark:text-white/30">Edited just now · Computational document</div>
+                            <div className="mt-3 text-[12px] font-medium text-black/32 dark:text-white/30">{copy.edited} · {copy.computational}</div>
                         </div>
 
                         <div className="mx-auto mt-8 max-w-[820px] sm:mt-10">
-                            <InsertPoint index={0} open={insertIndex === 0} onToggle={() => setInsertIndex(insertIndex === 0 ? null : 0)} onAdd={addBlock} />
+                            <InsertPoint index={0} open={insertIndex === 0} onToggle={() => setInsertIndex(insertIndex === 0 ? null : 0)} onAdd={addBlock} catalog={localizedBlockCatalog} commandHint={copy.allCommands} insertLabel={copy.insertBlock} />
 
                             {blocks.map((block, index) => (
                                 <React.Fragment key={block.id}>
@@ -897,28 +905,28 @@ export function NotebookWorkspace() {
                                         className={`group relative scroll-mt-28 rounded-[20px] transition-all duration-200 ${draggingId === block.id ? "opacity-40" : ""}`}
                                     >
                                         <div className={`absolute -left-10 top-3 hidden items-center gap-1 transition-opacity lg:flex ${activeBlockId === block.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
-                                            <button className="cursor-grab p-1.5 text-black/22 hover:text-black/50 active:cursor-grabbing dark:text-white/20 dark:hover:text-white/50" aria-label="Drag block">
+                                            <button className="cursor-grab p-1.5 text-black/22 hover:text-black/50 active:cursor-grabbing dark:text-white/20 dark:hover:text-white/50" aria-label={copy.drag}>
                                                 <GripVertical className="h-4 w-4" />
                                             </button>
                                         </div>
 
                                         <div className={`absolute right-2 top-2 z-10 flex items-center gap-0.5 rounded-full border border-black/[0.06] bg-white/90 p-1 shadow-sm backdrop-blur-xl transition-all dark:border-white/[0.08] dark:bg-[#181818]/92 ${activeBlockId === block.id ? "opacity-100" : "pointer-events-none -translate-y-1 opacity-0 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100"}`}>
                                             {(block.kind === "code" || block.kind === "graph") ? (
-                                                <button onClick={(event) => { event.stopPropagation(); runNotebook(); }} className="notebook-context-button" aria-label="Run block">
+                                                <button onClick={(event) => { event.stopPropagation(); runNotebook(); }} className="notebook-context-button" aria-label={copy.runBlock}>
                                                     <Play className="h-3.5 w-3.5" />
                                                 </button>
                                             ) : null}
                                             <div className="relative">
-                                                <button onClick={(event) => { event.stopPropagation(); setMenuBlockId(menuBlockId === block.id ? null : block.id); }} className="notebook-context-button" aria-label="Block actions">
+                                                <button onClick={(event) => { event.stopPropagation(); setMenuBlockId(menuBlockId === block.id ? null : block.id); }} className="notebook-context-button" aria-label={copy.blockActions}>
                                                     <MoreHorizontal className="h-4 w-4" />
                                                 </button>
                                                 {menuBlockId === block.id ? (
                                                     <div onClick={(event) => event.stopPropagation()} className="notebook-popover absolute right-0 top-9 w-48 p-1.5">
-                                                        <MenuButton icon={Copy} label="Duplicate" onClick={() => duplicateBlock(block.id)} />
-                                                        <MenuButton icon={ChevronUp} label="Move up" onClick={() => moveBlock(block.id, -1)} />
-                                                        <MenuButton icon={ChevronDown} label="Move down" onClick={() => moveBlock(block.id, 1)} />
+                                                        <MenuButton icon={Copy} label={copy.duplicate} onClick={() => duplicateBlock(block.id)} />
+                                                        <MenuButton icon={ChevronUp} label={copy.moveUp} onClick={() => moveBlock(block.id, -1)} />
+                                                        <MenuButton icon={ChevronDown} label={copy.moveDown} onClick={() => moveBlock(block.id, 1)} />
                                                         <div className="my-1 h-px bg-black/[0.06] dark:bg-white/[0.08]" />
-                                                        <MenuButton icon={Trash2} label="Delete" destructive onClick={() => removeBlock(block.id)} />
+                                                        <MenuButton icon={Trash2} label={copy.delete} destructive onClick={() => removeBlock(block.id)} />
                                                     </div>
                                                 ) : null}
                                             </div>
@@ -926,13 +934,13 @@ export function NotebookWorkspace() {
 
                                         <BlockRenderer block={block} active={activeBlockId === block.id} onChange={(patch) => updateBlock(block.id, patch)} />
                                     </div>
-                                    <InsertPoint index={index + 1} open={insertIndex === index + 1} onToggle={() => setInsertIndex(insertIndex === index + 1 ? null : index + 1)} onAdd={addBlock} />
+                                    <InsertPoint index={index + 1} open={insertIndex === index + 1} onToggle={() => setInsertIndex(insertIndex === index + 1 ? null : index + 1)} onAdd={addBlock} catalog={localizedBlockCatalog} commandHint={copy.allCommands} insertLabel={copy.insertBlock} />
                                 </React.Fragment>
                             ))}
 
                             {!blocks.length ? (
                                 <button onClick={() => setInsertIndex(0)} className="mx-auto flex min-h-44 w-full items-center justify-center rounded-[22px] border border-dashed border-black/10 text-sm font-semibold text-black/35 transition hover:border-black/20 hover:text-black/60 dark:border-white/10 dark:text-white/35 dark:hover:border-white/20 dark:hover:text-white/60">
-                                    <Plus className="mr-2 h-4 w-4" /> Add your first block
+                            <Plus className="mr-2 h-4 w-4" /> {copy.addFirst}
                                 </button>
                             ) : null}
                         </div>
@@ -949,13 +957,13 @@ export function NotebookWorkspace() {
                                 autoFocus
                                 value={commandSearch}
                                 onChange={(event) => setCommandSearch(event.target.value)}
-                                placeholder="Search blocks and actions…"
+                                placeholder={copy.search}
                                 className="h-14 flex-1 bg-transparent text-sm outline-none placeholder:text-black/30 dark:placeholder:text-white/30"
                             />
                             <kbd className="rounded-md border border-black/[0.08] px-1.5 py-1 text-[10px] text-black/35 dark:border-white/[0.1] dark:text-white/35">ESC</kbd>
                         </div>
                         <div className="p-1.5">
-                            <div className="px-3 pb-1 pt-2 text-[10px] font-extrabold uppercase tracking-[0.16em] text-black/30 dark:text-white/28">Add block</div>
+                            <div className="px-3 pb-1 pt-2 text-[10px] font-extrabold uppercase tracking-[0.16em] text-black/30 dark:text-white/28">{copy.addBlock}</div>
                             {filteredCatalog.map((item) => (
                                 <button key={item.kind} onClick={() => addBlock(item.kind)} className="flex w-full items-center gap-3 rounded-[14px] px-3 py-3 text-left transition hover:bg-black/[0.045] dark:hover:bg-white/[0.06]">
                                     <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-black/[0.045] dark:bg-white/[0.07]"><item.icon className="h-4 w-4" /></span>
@@ -975,28 +983,28 @@ export function NotebookWorkspace() {
                     <div className="notebook-modal w-full max-w-md p-6">
                         <div className="flex items-start justify-between gap-6">
                             <div>
-                                <div className="text-lg font-extrabold tracking-[-0.025em]">Share notebook</div>
-                                <div className="mt-1 text-xs leading-5 text-black/42 dark:text-white/40">Invite collaborators or copy a public demo link.</div>
+                                <div className="text-lg font-extrabold tracking-[-0.025em]">{copy.shareTitle}</div>
+                                <div className="mt-1 text-xs leading-5 text-black/42 dark:text-white/40">{copy.shareDescription}</div>
                             </div>
                             <button onClick={() => setShareOpen(false)} className="notebook-icon-button"><X className="h-4 w-4" /></button>
                         </div>
                         <div className="mt-6 flex items-center gap-2 rounded-[14px] border border-black/[0.08] bg-black/[0.025] p-2 dark:border-white/[0.09] dark:bg-white/[0.04]">
-                            <div className="min-w-0 flex-1 truncate px-2 text-xs text-black/45 dark:text-white/42">{shareLink || "Current workspace"}</div>
+                            <div className="min-w-0 flex-1 truncate px-2 text-xs text-black/45 dark:text-white/42">{shareLink || copy.currentWorkspace}</div>
                             <button
                                 onClick={() => {
                                     const link = shareLink || window.location.href;
                                     void navigator.clipboard?.writeText(link);
-                                    setExecutionMessage("Workspace link copied.");
+                                    setExecutionMessage(copy.copied);
                                 }}
                                 className="rounded-[10px] bg-black px-3 py-2 text-xs font-bold text-white dark:bg-white dark:text-black"
-                            >Copy link</button>
+                            >{locale === "uz" ? "Havolani nusxalash" : "Copy link"}</button>
                         </div>
                         <div className="mt-5 flex items-center justify-between rounded-[14px] border border-black/[0.06] px-4 py-3 dark:border-white/[0.08]">
                             <div>
-                                <div className="text-xs font-bold">Anyone with the link</div>
-                                <div className="mt-1 text-[11px] text-black/38 dark:text-white/36">Can view this notebook</div>
+                                <div className="text-xs font-bold">{copy.anyone}</div>
+                                <div className="mt-1 text-[11px] text-black/38 dark:text-white/36">{copy.canView}</div>
                             </div>
-                            <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">View only</span>
+                            <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">{copy.viewOnly}</span>
                         </div>
                     </div>
                 </ModalBackdrop>
@@ -1007,8 +1015,8 @@ export function NotebookWorkspace() {
                     <div className="notebook-modal w-full max-w-lg p-6">
                         <div className="flex items-start justify-between">
                             <div>
-                                <div className="text-lg font-extrabold tracking-[-0.025em]">Version history</div>
-                                <div className="mt-1 text-xs text-black/40 dark:text-white/38">Local notebook snapshots</div>
+                                <div className="text-lg font-extrabold tracking-[-0.025em]">{copy.versionHistory}</div>
+                                <div className="mt-1 text-xs text-black/40 dark:text-white/38">{copy.localSnapshots}</div>
                             </div>
                             <button onClick={() => setHistoryOpen(false)} className="notebook-icon-button"><X className="h-4 w-4" /></button>
                         </div>
@@ -1023,7 +1031,7 @@ export function NotebookWorkspace() {
                                     {index === 0 ? <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> : null}
                                 </button>
                             )) : (
-                                <div className="rounded-[15px] border border-dashed border-black/[0.08] px-4 py-5 text-xs text-black/40 dark:border-white/[0.1] dark:text-white/38">Snapshots will appear after the first edit.</div>
+                                <div className="rounded-[15px] border border-dashed border-black/[0.08] px-4 py-5 text-xs text-black/40 dark:border-white/[0.1] dark:text-white/38">{copy.snapshotEmpty}</div>
                             )}
                         </div>
                     </div>
@@ -1035,8 +1043,8 @@ export function NotebookWorkspace() {
                     <div className="notebook-modal w-full max-w-lg p-6">
                         <div className="flex items-start justify-between gap-6">
                             <div>
-                                <div className="text-lg font-extrabold tracking-[-0.025em]">Documents</div>
-                                <div className="mt-1 text-xs text-black/40 dark:text-white/38">Saved notebooks in this workspace</div>
+                                <div className="text-lg font-extrabold tracking-[-0.025em]">{copy.savedNotebooks}</div>
+                                <div className="mt-1 text-xs text-black/40 dark:text-white/38">{copy.savedNotebooksDetail}</div>
                             </div>
                             <button onClick={() => setDocumentsOpen(false)} className="notebook-icon-button"><X className="h-4 w-4" /></button>
                         </div>
@@ -1051,7 +1059,7 @@ export function NotebookWorkspace() {
                                     {document.id === backendDocumentId ? <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> : null}
                                 </button>
                             )) : (
-                                <div className="rounded-[15px] border border-dashed border-black/[0.08] px-4 py-5 text-xs text-black/40 dark:border-white/[0.1] dark:text-white/38">No saved notebooks yet. Add a block and it will appear here.</div>
+                                <div className="rounded-[15px] border border-dashed border-black/[0.08] px-4 py-5 text-xs text-black/40 dark:border-white/[0.1] dark:text-white/38">{copy.noSaved}</div>
                             )}
                         </div>
                     </div>
@@ -1063,8 +1071,8 @@ export function NotebookWorkspace() {
                     <div className="notebook-modal w-full max-w-md p-6">
                         <div className="flex items-start justify-between">
                             <div>
-                                <div className="text-lg font-extrabold tracking-[-0.025em]">Export</div>
-                                <div className="mt-1 text-xs text-black/40 dark:text-white/38">Keep the notebook clean; choose a format only when needed.</div>
+                                <div className="text-lg font-extrabold tracking-[-0.025em]">{copy.export}</div>
+                                <div className="mt-1 text-xs text-black/40 dark:text-white/38">{copy.exportDetail}</div>
                             </div>
                             <button onClick={() => setExportOpen(false)} className="notebook-icon-button"><X className="h-4 w-4" /></button>
                         </div>
@@ -1226,11 +1234,17 @@ function InsertPoint({
     open,
     onToggle,
     onAdd,
+    catalog,
+    commandHint,
+    insertLabel,
 }: {
     index: number;
     open: boolean;
     onToggle: () => void;
     onAdd: (kind: BlockKind, index: number) => void;
+    catalog: typeof blockCatalog;
+    commandHint: string;
+    insertLabel: string;
 }) {
     return (
         <div className="group/insert relative flex h-10 items-center justify-center">
@@ -1238,19 +1252,19 @@ function InsertPoint({
             <button
                 onClick={onToggle}
                 className={`relative z-10 flex h-7 w-7 items-center justify-center rounded-full border bg-white text-black/35 shadow-sm transition hover:scale-105 hover:text-black/65 dark:bg-[#151515] dark:text-white/35 dark:hover:text-white/70 ${open ? "border-black/15 opacity-100 dark:border-white/18" : "border-black/[0.07] opacity-0 group-hover/insert:opacity-100 dark:border-white/[0.09]"}`}
-                aria-label="Insert block"
+                aria-label={insertLabel}
             >
                 <Plus className={`h-3.5 w-3.5 transition ${open ? "rotate-45" : ""}`} />
             </button>
             {open ? (
                 <div className="notebook-popover absolute left-1/2 top-9 z-30 w-[220px] -translate-x-1/2 p-1.5">
-                    {blockCatalog.map((item) => (
+                    {catalog.map((item) => (
                         <button key={item.kind} onClick={() => onAdd(item.kind, index)} className="flex w-full items-center gap-3 rounded-[12px] px-2.5 py-2 text-left transition hover:bg-black/[0.045] dark:hover:bg-white/[0.06]">
                             <span className="flex h-7 w-7 items-center justify-center rounded-[9px] bg-black/[0.04] dark:bg-white/[0.07]"><item.icon className="h-3.5 w-3.5" /></span>
                             <span className="text-xs font-semibold">{item.label}</span>
                         </button>
                     ))}
-                    <div className="mt-1 border-t border-black/[0.055] px-2.5 pt-2 text-[10px] text-black/30 dark:border-white/[0.07] dark:text-white/30">⌘K for all commands</div>
+                    <div className="mt-1 border-t border-black/[0.055] px-2.5 pt-2 text-[10px] text-black/30 dark:border-white/[0.07] dark:text-white/30">{commandHint}</div>
                 </div>
             ) : null}
         </div>

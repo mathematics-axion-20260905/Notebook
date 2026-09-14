@@ -13,8 +13,8 @@ export function EcosystemBar({ currentApp, projectId, projectTitle }: { currentA
   const [activeProjectTitle, setActiveProjectTitle] = useState(projectTitle || null);
   const { locale } = useLocale();
   const labels = locale === "uz"
-    ? { math: "Matematika", notebook: "Notebook", writer: "Writer", science: "Kashf etish", nav: "Ilmiy ekotizim", project: "Loyiha", active: "Faol loyiha", local: "Mahalliy ish maydoni" }
-    : { math: "Math", notebook: "Notebook", writer: "Writer", science: "Explore", nav: "Science ecosystem", project: "Project", active: "Active project", local: "Local workspace" };
+    ? { math: "Matematika", notebook: "Notebook", writer: "Writer", science: "Ilmiy markaz", nav: "Ilmiy ekotizim", project: "Loyiha", active: "Faol loyiha", local: "Mahalliy ish maydoni" }
+    : { math: "Math", notebook: "Notebook", writer: "Writer", science: "Science Hub", nav: "Science ecosystem", project: "Project", active: "Active project", local: "Local workspace" };
 
   useEffect(() => {
     const resolvedId = resolveActiveProjectId(projectId);
