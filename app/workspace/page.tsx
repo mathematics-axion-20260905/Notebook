@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import { ProjectObjectTray } from "@/components/ecosystem/project-object-tray";
-import { ComputationalNotebook } from "@/features/notebook/ui/computational-notebook";
+import { NotebookWorkspaceEntry } from "@/features/notebook/ui/notebook-workspace-entry";
 import { noIndexRobots } from "@/lib/seo";
 
 export const metadata: Metadata = {
@@ -11,10 +10,5 @@ export const metadata: Metadata = {
 };
 
 export default function NotebookWorkspacePage() {
-    return (
-        <div className="ax-workspace-root ax-notebook-workspace">
-            <ProjectObjectTray />
-            <ComputationalNotebook />
-        </div>
-    );
+    return <div className="ax-workspace-root ax-notebook-workspace"><NotebookWorkspaceEntry /></div>;
 }

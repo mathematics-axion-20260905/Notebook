@@ -1,6 +1,14 @@
 export const ACTIVE_PROJECT_KEY = "axion.science.active-project.v1";
 export const LOCAL_PROJECTS_KEY = "axion.science.projects.v1";
 
+export type LocalProjectSummary = {
+  id: string;
+  title: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export function rememberActiveProjectId(projectId: string | null | undefined) {
   if (typeof window === "undefined" || !projectId) return;
   window.localStorage.setItem(ACTIVE_PROJECT_KEY, projectId);
@@ -23,5 +31,20 @@ export function getLocalProjectTitle(projectId: string | null | undefined) {
     return projects.find((project) => project.id === projectId)?.title || null;
   } catch {
     return null;
+  }
+}
+
+export function listLocalProjects(): LocalProjectSummary[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(LOCAL_PROJECTS_KEY);
+    if (!raw) return [];
+    const projects = JSON.parse(raw) as LocalProjectSummary[];
+    if (!Array.isArray(projects)) return [];
+    return projects
+      .filter((project) => typeof project?.id === "string" && typeof project?.title === "string")
+      .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+  } catch {
+    return [];
   }
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useRouter } from "next/navigation";
 import {
     ArrowLeft,
     Check,
@@ -224,6 +225,7 @@ function downloadNotebookFile(filename: string, content: string, mediaType = "te
 }
 
 export function NotebookWorkspace() {
+    const router = useRouter();
     const { theme, setTheme } = useTheme();
     const { locale } = useLocale();
     const copy = locale === "uz"
@@ -306,17 +308,19 @@ export function NotebookWorkspace() {
         let alive = true;
         const searchParams = new URLSearchParams(window.location.search);
         const isTransferHydration = searchParams.get("source") === "transfer" && Boolean(searchParams.get("transferId"));
+        const isFreshDocument = searchParams.get("new") === "1";
         const activeProjectId = resolveActiveProjectId();
         const storedId = window.localStorage.getItem("axion-notebook-backend-document-id");
+        const preferredDocumentId = searchParams.get("document") || storedId;
         void ensureNotebookGuestSession()
-            .then(() => fetchNotebookDocuments(activeProjectId, storedId))
+            .then(() => fetchNotebookDocuments(activeProjectId, preferredDocumentId))
             .then((documents) => {
                 if (alive) setDocuments(documents);
                 // A cross-app Scientific Object import owns the initial state for
                 // this navigation. Loading an older/default document afterwards
                 // would overwrite the imported block before autosave completes.
-                if (!alive || isTransferHydration || !documents.length) return;
-                const document = documents.find((item: { id: string }) => item.id === storedId) || documents[0];
+                if (!alive || isTransferHydration || isFreshDocument || !documents.length) return;
+                const document = documents.find((item: { id: string }) => item.id === preferredDocumentId) || documents[0];
                 if (!document) return;
                 setBackendDocumentId(document.id);
                 setDocumentTitle(document.title);
@@ -755,7 +759,7 @@ export function NotebookWorkspace() {
             <header className="sticky top-0 z-50 border-b border-black/[0.06] bg-[#f7f7f5]/90 backdrop-blur-2xl dark:border-white/[0.08] dark:bg-[#0b0b0b]/88">
                 <div className="mx-auto flex h-[62px] max-w-[1680px] items-center gap-3 px-4 sm:px-6">
                     <div className="flex min-w-0 flex-1 items-center gap-2">
-                        <button className="notebook-icon-button" aria-label={copy.back}>
+                        <button onClick={() => router.push("/workspace")} className="notebook-icon-button" aria-label={copy.back}>
                             <ArrowLeft className="h-[18px] w-[18px]" />
                         </button>
                         <div className="flex items-center gap-2.5">
