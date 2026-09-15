@@ -378,7 +378,11 @@ export function NotebookWorkspace() {
                 .then((object) => {
                     if (!object?.revision?.payload || typeof object.revision.payload !== "object") return;
                     const payload = object.revision.payload as Record<string, unknown>;
-                    const report = typeof payload.report_markdown === "string" ? payload.report_markdown : "";
+                    const report = typeof payload.presentation_markdown === "string"
+                        ? payload.presentation_markdown
+                        : typeof payload.report_markdown === "string"
+                            ? payload.report_markdown
+                            : "";
                     const summary = typeof payload.summary === "string" ? payload.summary : "";
                     const content = report.trim() || summary.trim() || JSON.stringify(payload, null, 2);
                     const scientificObjectReference: ScientificObjectReference = {
