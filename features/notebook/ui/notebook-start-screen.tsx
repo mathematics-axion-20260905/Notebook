@@ -6,7 +6,7 @@ import { ArrowRight, BookOpenText, Clock3, FileText, FolderKanban, Plus } from "
 
 import { AxionMark } from "@/components/axion";
 import { useLocale } from "@/components/locale-provider";
-import { getEcosystemHref } from "@/lib/ecosystem/apps";
+import { getEcosystemHref, getEcosystemProjectsHref } from "@/lib/ecosystem/apps";
 import { getRemoteProject } from "@/lib/ecosystem/remote-object-store";
 import { listLocalProjects, resolveActiveProjectId, type LocalProjectSummary } from "@/lib/ecosystem/project-context";
 import { fetchNotebookDocuments } from "@/lib/notebook";
@@ -90,7 +90,7 @@ export function NotebookStartScreen() {
             <span className="min-w-0 leading-none"><span className="block truncate font-serif text-[19px] font-medium tracking-[-0.03em]">Axion Notebook</span><span className="mt-1 block text-[8px] font-semibold uppercase tracking-[0.2em] text-[var(--ax-text-faint)]">{copy.brandLine}</span></span>
           </Link>
           <div className="flex items-center gap-2">
-            <Link href={getEcosystemHref("science", "notebook")} className="hidden h-9 items-center rounded-[var(--ax-work-control-radius)] px-3 text-[11px] font-semibold text-[var(--ax-text-soft)] hover:bg-[var(--ax-work-surface-muted)] hover:text-[var(--ax-text)] sm:inline-flex">{copy.openProjects}</Link>
+            <Link href={getEcosystemProjectsHref()} className="hidden h-9 items-center rounded-[var(--ax-work-control-radius)] px-3 text-[11px] font-semibold text-[var(--ax-text-soft)] hover:bg-[var(--ax-work-surface-muted)] hover:text-[var(--ax-text)] sm:inline-flex">{copy.openProjects}</Link>
             <Link href="/workspace?new=1" className="inline-flex h-9 items-center gap-2 rounded-[var(--ax-work-control-radius)] bg-[var(--ax-accent-strong)] px-3.5 text-[11px] font-semibold text-white hover:bg-[var(--ax-accent)]"><Plus className="h-3.5 w-3.5" />{copy.newNotebook}</Link>
           </div>
         </div>
@@ -122,10 +122,10 @@ export function NotebookStartScreen() {
                   <div className="mt-5 flex items-center justify-between border-t border-[var(--ax-work-line)] pt-3 text-[10px] font-semibold text-[var(--ax-text-faint)]"><span>{copy.open}</span><ArrowRight className="h-3.5 w-3.5 text-[var(--ax-accent)] transition-transform group-hover:translate-x-0.5" /></div>
                 </Link>
               ))}
-              <Link href={getEcosystemHref("science", "notebook")} className="flex min-h-[190px] flex-col justify-between rounded-[var(--ax-work-panel-radius)] border border-dashed border-[var(--ax-line-strong)] p-5 text-[var(--ax-text-soft)] transition hover:bg-[var(--ax-work-surface-muted)]"><span className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--ax-work-line)] text-[var(--ax-accent)]"><Plus className="h-4 w-4" /></span><span><span className="block font-serif text-[21px] text-[var(--ax-text)]">{copy.openProjects}</span><span className="mt-1 block text-[11px] leading-5">{copy.noProjectsDetail}</span></span></Link>
+              <Link href={getEcosystemProjectsHref()} className="flex min-h-[190px] flex-col justify-between rounded-[var(--ax-work-panel-radius)] border border-dashed border-[var(--ax-line-strong)] p-5 text-[var(--ax-text-soft)] transition hover:bg-[var(--ax-work-surface-muted)]"><span className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--ax-work-line)] text-[var(--ax-accent)]"><Plus className="h-4 w-4" /></span><span><span className="block font-serif text-[21px] text-[var(--ax-text)]">{copy.openProjects}</span><span className="mt-1 block text-[11px] leading-5">{copy.noProjectsDetail}</span></span></Link>
             </div>
           ) : (
-            <div className="grid gap-4 rounded-[var(--ax-work-panel-radius)] border border-dashed border-[var(--ax-line-strong)] p-6 sm:grid-cols-[1fr_auto] sm:items-center"><div><h3 className="font-serif text-[24px] tracking-[-0.035em]">{copy.noProjects}</h3><p className="mt-2 max-w-xl text-[12px] leading-6 text-[var(--ax-text-soft)]">{copy.noProjectsDetail}</p></div><Link href={getEcosystemHref("science", "notebook")} className="inline-flex h-10 items-center justify-center rounded-[var(--ax-work-control-radius)] bg-[var(--ax-accent-strong)] px-4 text-[11px] font-semibold text-white hover:bg-[var(--ax-accent)]">{copy.openProjects}</Link></div>
+            <div className="grid gap-4 rounded-[var(--ax-work-panel-radius)] border border-dashed border-[var(--ax-line-strong)] p-6 sm:grid-cols-[1fr_auto] sm:items-center"><div><h3 className="font-serif text-[24px] tracking-[-0.035em]">{copy.noProjects}</h3><p className="mt-2 max-w-xl text-[12px] leading-6 text-[var(--ax-text-soft)]">{copy.noProjectsDetail}</p></div><Link href={getEcosystemProjectsHref()} className="inline-flex h-10 items-center justify-center rounded-[var(--ax-work-control-radius)] bg-[var(--ax-accent-strong)] px-4 text-[11px] font-semibold text-white hover:bg-[var(--ax-accent)]">{copy.openProjects}</Link></div>
           )}
         </section>
 
