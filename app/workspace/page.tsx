@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { NotebookWorkspaceEntry } from "@/features/notebook/ui/notebook-workspace-entry";
 import { noIndexRobots } from "@/lib/seo";
 
@@ -10,5 +11,5 @@ export const metadata: Metadata = {
 };
 
 export default function NotebookWorkspacePage() {
-    return <div className="ax-workspace-root ax-notebook-workspace"><NotebookWorkspaceEntry /></div>;
+    return <div className="ax-workspace-root ax-notebook-workspace"><Suspense fallback={<div className="min-h-screen bg-[var(--ax-canvas)]" aria-hidden="true" />}><NotebookWorkspaceEntry /></Suspense></div>;
 }
